@@ -1,9 +1,19 @@
-// 使用官方 GStatic 模組路徑以確保 app 與 firestore 模組的相容性與正確連結
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
+import { initializeApp, getApp, getApps } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
 import { getFirestore } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
+import { 
+  getAuth, 
+  initializeAuth,
+  browserLocalPersistence,
+  browserPopupRedirectResolver,
+  GoogleAuthProvider, 
+  signInWithRedirect, 
+  getRedirectResult, 
+  onAuthStateChanged, 
+  signOut 
+} from "https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBuOD8-PHR8KCzRqL09JTzGkhGNSs0OnEc",
+  apiKey: "AIzaSyDKwP_hdehGHJ2JdEU4R5O0jX9D2lyWThE",
   authDomain: "wbc-tokyo-2026.firebaseapp.com",
   projectId: "wbc-tokyo-2026",
   storageBucket: "wbc-tokyo-2026.firebasestorage.app",
@@ -12,14 +22,24 @@ const firebaseConfig = {
   measurementId: "G-4J288J7EQJ"
 };
 
-let db = null;
+// 確保 App 僅初始化一次
+const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+const db = getFirestore(app);
 
+// 使用 initializeAuth 以確保 Redirect 解析器被正確載入
+let auth: any;
 try {
-  const app = initializeApp(firebaseConfig);
-  db = getFirestore(app);
-} catch (error) {
-  // 捕捉初始化錯誤，防止 App 因 Firebase 問題而崩潰白屏
-  console.error("Firebase initialization failed:", error);
+  auth = getAuth(app);
+} catch (e) {
+  auth = initializeAuth(app, {
+    persistence: browserLocalPersistence,
+    popupRedirectResolver: browserPopupRedirectResolver,
+  });
 }
 
-export { db };
+const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({ 
+  prompt: 'select_account' 
+});
+
+export { db, auth, googleProvider, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut };

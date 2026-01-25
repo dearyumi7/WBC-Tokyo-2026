@@ -5,6 +5,8 @@ import { Member, Transaction } from '../types';
 
 interface ExpenseViewProps {
   members: Member[];
+  /* Fix: Add isEditable prop */
+  isEditable?: boolean;
 }
 
 const CATEGORIES = [
@@ -16,7 +18,7 @@ const CATEGORIES = [
   { label: '其他', icon: '✨' },
 ];
 
-const ExpenseView: React.FC<ExpenseViewProps> = ({ members }) => {
+const ExpenseView: React.FC<ExpenseViewProps> = ({ members, isEditable = false }) => {
   // Persistence for Exchange Rate
   const [exchangeRate, setExchangeRate] = useState<string>(() => {
     const saved = localStorage.getItem('tokyo_wbc_exchange_rate');
@@ -307,12 +309,15 @@ const ExpenseView: React.FC<ExpenseViewProps> = ({ members }) => {
       <section>
         <div className="flex justify-between items-center mb-3 px-2">
           <h2 className="text-lg font-bold">帳務明細</h2>
-          <button 
-            onClick={() => setIsModalOpen(true)}
-            className="p-2 bg-slate-900 text-white rounded-full active:scale-95 transition-transform"
-          >
-            <Plus size={18}/>
-          </button>
+          {/* Fix: Gate add expense button with isEditable */}
+          {isEditable && (
+            <button 
+              onClick={() => setIsModalOpen(true)}
+              className="p-2 bg-slate-900 text-white rounded-full active:scale-95 transition-transform"
+            >
+              <Plus size={18}/>
+            </button>
+          )}
         </div>
         <div className="space-y-3">
           {expenses.map((exp) => {

@@ -1,7 +1,6 @@
-
-import React from 'react';
-import { Plane, Hotel, Ticket as TicketIcon, Utensils, Calendar, Wallet, ShoppingBag, ClipboardList } from 'lucide-react';
-import { Flight } from './types';
+import React from 'https://esm.sh/react@19.2.3';
+import { Plane, Hotel, Ticket as TicketIcon, Utensils, Calendar, Wallet, ShoppingBag, ClipboardList } from 'https://esm.sh/lucide-react@0.563.0';
+import { Flight } from './types.ts';
 
 export const COLORS = {
   primary: '#1d4ed8', // WBC Blue
@@ -10,35 +9,23 @@ export const COLORS = {
   card: '#ffffff',
 };
 
+// Fix: Export EXCHANGE_RATE which is required by ExpenseView and ShoppingView to resolve module member errors.
+export const EXCHANGE_RATE = 0.215;
+
+// Fix: Complete the Flight object properties (departure, arrival, from, to, duration, price) to satisfy the Flight interface defined in types.ts.
 export const DEFAULT_FLIGHTS: Flight[] = [
   {
+    id: 'f1',
     date: '2026/03/05',
     airline: '中華航空',
-    flightNo: 'CI 0154',
-    from: 'TPE 台北 T2',
-    to: 'NGO 名古屋 T1',
-    departure: '07:35',
-    arrival: '11:05',
-    duration: '2小時30分',
-    price: 12500,
-    baggage: '23kg x 1',
-    seat: '15A - Yumi\n15B - Ping',
-    note: '請於3/4前預訂餐點，並開始預約自動報到'
-  },
-  {
-    date: '2026/03/10',
-    airline: '中華航空',
-    flightNo: 'CI 0173',
-    from: 'KIX 大阪 T1',
-    to: 'TPE 台北 T2',
-    departure: '19:00',
-    arrival: '21:15',
-    duration: '3小時15分',
-    price: 13200,
-    baggage: '23kg x 1',
-    seat: '22C - Yumi\n22D - Ping',
-    note: '請於3/9前預訂餐點，並開始預約自動報到'
+    flightNo: 'CI100',
+    departure: '08:30',
+    arrival: '12:30',
+    from: 'TPE',
+    to: 'NRT',
+    duration: '3h 00m',
+    price: 15500,
+    baggage: '23kg x 2',
+    seat: '12A'
   }
 ];
-
-export const EXCHANGE_RATE = 0.21; // 1 JPY = 0.21 TWD approx

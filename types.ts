@@ -8,6 +8,8 @@ export interface Member {
 }
 
 export interface Flight {
+  /* Fix: Add optional id property */
+  id?: string;
   airline: string;
   flightNo: string;
   departure: string;
@@ -33,6 +35,8 @@ export interface TransportTransfer {
 }
 
 export interface Transport {
+  /* Fix: Add optional id property */
+  id?: string;
   type: string;
   name: string;
   date: string;
@@ -50,6 +54,8 @@ export interface Transport {
 }
 
 export interface Accommodation {
+  /* Fix: Add optional id property */
+  id?: string;
   name: string;
   address: string;
   checkIn: string;
@@ -76,6 +82,8 @@ export interface Ticket {
 }
 
 export interface Restaurant {
+  /* Fix: Add optional id property */
+  id?: string;
   name: string;
   date: string;
   time: string;
