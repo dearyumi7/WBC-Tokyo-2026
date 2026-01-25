@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'https://esm.sh/react@19.2.3';
+import React, { useState, useEffect, useRef } from 'https://esm.sh/react@19.2.3';
 import { Plane, Hotel, Ticket as TicketIcon, Utensils, Calendar, Wallet, ShoppingBag, ClipboardList, Users } from 'https://esm.sh/lucide-react@0.563.0';
-import { TabType, Flight, Transport, Accommodation, Ticket, Restaurant, Member, ShoppingItem, TripConfig } from './types.ts';
+import { doc, onSnapshot, setDoc, updateDoc } from 'https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js';
+import { db } from './firebase.ts';
+import { TabType, Flight, Transport, Accommodation, Ticket, Restaurant, Member, ShoppingItem, TripConfig, ScheduleItem, Transaction, ChecklistItem, NoteItem } from './types.ts';
 import { COLORS, DEFAULT_FLIGHTS, EXCHANGE_RATE } from './constants.tsx';
 import BookingView from './components/BookingView.tsx';
 import ItineraryView from './components/ItineraryView.tsx';
@@ -8,31 +10,24 @@ import ExpenseView from './components/ExpenseView.tsx';
 import ShoppingView from './components/ShoppingView.tsx';
 import PrepView from './components/PrepView.tsx';
 
+const tripDocRef = doc(db, 'trips', 'tokyo_wbc_2026_shared');
+
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('itinerary');
+  const [hasLoaded, setHasLoaded] = useState(false);
+  const isCloudUpdate = useRef(false);
 
-  // Trip Configuration State
-  const [tripConfig, setTripConfig] = useState<TripConfig>(() => {
-    const saved = localStorage.getItem('tokyo_wbc_trip_config');
-    if (saved) return JSON.parse(saved);
-    return {
-      name: 'WBC Tokyo 2026',
-      startDate: '2026-03-05',
-      endDate: '2026-03-10',
-      currencies: ['JPY', 'TWD']
-    };
+  // --- 全域同步狀態 ---
+  const [tripConfig, setTripConfig] = useState<TripConfig>({
+    name: 'WBC Tokyo 2026',
+    startDate: '2026-03-05',
+    endDate: '2026-03-10',
+    currencies: ['JPY', 'TWD']
   });
-
-  useEffect(() => {
-    localStorage.setItem('tokyo_wbc_trip_config', JSON.stringify(tripConfig));
-  }, [tripConfig]);
-
-  // State Management
   const [members, setMembers] = useState<Member[]>([
     { id: '1', name: 'Yumi', color: 'bg-blue-500' },
     { id: '2', name: 'Ping', color: 'bg-pink-500' }
   ]);
-
   const [flights, setFlights] = useState<Flight[]>(DEFAULT_FLIGHTS);
   const [transports, setTransports] = useState<Transport[]>([
     {
@@ -76,30 +71,6 @@ const App: React.FC = () => {
       seat: '389 & 390',
       notes: '',
       iconType: 'trophy'
-    },
-    {
-      id: 't2',
-      category: '球賽票券',
-      event: 'WBC Pool C',
-      date: '2026/03/07',
-      time: '12:00',
-      teams: 'Czechia vs Chinese Taipei',
-      section: 'D12',
-      row: '5',
-      seat: '290 & 291',
-      location: 'Tokyo Dome',
-      notes: '',
-      iconType: 'trophy'
-    },
-    {
-      id: 't3',
-      category: '景點票券',
-      event: 'SHIBUYA SKY 展望台',
-      date: '2026/03/06',
-      time: '16:30',
-      location: 'Shibuya Scramble Square',
-      notes: '請提前 15 分鐘抵達 14 樓入口',
-      iconType: 'camera'
     }
   ]);
   const [restaurants, setRestaurants] = useState<Restaurant[]>([
@@ -113,13 +84,84 @@ const App: React.FC = () => {
       iconType: 'steak'
     }
   ]);
-
   const [shoppingItems, setShoppingItems] = useState<ShoppingItem[]>([
-    { id: '1', name: 'WBC 紀念球衣', category: '服飾', quantity: 1, note: 'XL號 藍色', jpyPrice: 12000, twdPrice: 3200, checked: false, memberId: '1', location: 'Tokyo Dome' },
-    { id: '2', name: '大谷翔平簽名球', category: '週邊', quantity: 1, note: '如果還有貨的話', jpyPrice: 5000, twdPrice: 1500, checked: true, memberId: '1', location: 'Tokyo Dome' },
-    { id: '3', name: '合利他命 EX Plus', category: '藥品', quantity: 3, note: '幫家人帶', jpyPrice: 6500, twdPrice: 2200, checked: false, memberId: '2', location: '藥妝店' },
-    { id: '4', name: '一蘭拉麵包', category: '食品', quantity: 2, note: '機場買', jpyPrice: 2000, twdPrice: 550, checked: false, memberId: '2', location: '機場' },
+    { id: '1', name: 'WBC 紀念球衣', category: '服飾', quantity: 1, note: 'XL號 藍色', jpyPrice: 12000, twdPrice: 3200, checked: false, memberId: '1', location: 'Tokyo Dome' }
   ]);
+  const [scheduleItems, setScheduleItems] = useState<ScheduleItem[]>([
+    { 
+      id: '1', 
+      time: '05:35', 
+      event: '抵達桃園機場第二航廈', 
+      addr: 'Taoyuan International Airport T2', 
+      type: 'transport'
+    }
+  ]);
+  const [expenses, setExpenses] = useState<Transaction[]>([]);
+  const [exchangeRate, setExchangeRate] = useState<string>(EXCHANGE_RATE.toString());
+  const [todo, setTodo] = useState<ChecklistItem[]>([]);
+  const [packing, setPacking] = useState<ChecklistItem[]>([]);
+  const [notes, setNotes] = useState<NoteItem[]>([]);
+
+  // --- Firestore 監聽器 ---
+  useEffect(() => {
+    const unsubscribe = onSnapshot(tripDocRef, (snap) => {
+      // 忽略本地產生的變動，避免 UI 抖動
+      if (snap.metadata.hasPendingWrites) return;
+
+      if (snap.exists()) {
+        const cloud = snap.data();
+        isCloudUpdate.current = true;
+        if (cloud.tripConfig) setTripConfig(cloud.tripConfig);
+        if (cloud.members) setMembers(cloud.members);
+        if (cloud.flights) setFlights(cloud.flights);
+        if (cloud.transports) setTransports(cloud.transports);
+        if (cloud.hotels) setHotels(cloud.hotels);
+        if (cloud.tickets) setTickets(cloud.tickets);
+        if (cloud.restaurants) setRestaurants(cloud.restaurants);
+        if (cloud.shoppingItems) setShoppingItems(cloud.shoppingItems);
+        if (cloud.scheduleItems) setScheduleItems(cloud.scheduleItems);
+        if (cloud.expenses) setExpenses(cloud.expenses);
+        if (cloud.exchangeRate) setExchangeRate(cloud.exchangeRate);
+        if (cloud.todo) setTodo(cloud.todo);
+        if (cloud.packing) setPacking(cloud.packing);
+        if (cloud.notes) setNotes(cloud.notes);
+        
+        // 短暫鎖定以避免 setDoc 觸發循環
+        setTimeout(() => { isCloudUpdate.current = false; }, 300);
+      }
+      setHasLoaded(true);
+    }, (error) => {
+      console.error("Firestore Error:", error);
+      setHasLoaded(true);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // --- 行程資料（ScheduleItems）即時同步機制 ---
+  useEffect(() => {
+    if (!hasLoaded || isCloudUpdate.current) return;
+    
+    // 行程內容發生變化時立即同步至雲端
+    updateDoc(tripDocRef, { scheduleItems }).catch(err => {
+      console.error("Immediate Itinerary Sync Error:", err);
+    });
+  }, [scheduleItems, hasLoaded]);
+
+  // --- 其他資料類別的自動儲存機制（帶延遲以減少寫入頻率） ---
+  useEffect(() => {
+    if (!hasLoaded || isCloudUpdate.current) return;
+
+    const timer = setTimeout(() => {
+      setDoc(tripDocRef, {
+        tripConfig, members, flights, transports, hotels, tickets, restaurants,
+        shoppingItems, expenses, exchangeRate, todo, packing, notes
+      }, { merge: true }).catch(err => {
+        console.error("Cloud Save Error:", err);
+      });
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, [tripConfig, members, flights, transports, hotels, tickets, restaurants, shoppingItems, expenses, exchangeRate, todo, packing, notes, hasLoaded]);
 
   const renderContent = () => {
     switch (activeTab) {
@@ -130,19 +172,35 @@ const App: React.FC = () => {
           hotels={hotels} setHotels={setHotels}
           tickets={tickets} setTickets={setTickets}
           restaurants={restaurants} setRestaurants={setRestaurants}
-          members={members}
-          isEditable={true}
+          members={members} isEditable={true}
         />;
       case 'itinerary':
-        return <ItineraryView startDate={tripConfig.startDate} endDate={tripConfig.endDate} />;
+        return <ItineraryView 
+          startDate={tripConfig.startDate} endDate={tripConfig.endDate} 
+          scheduleItems={scheduleItems} setScheduleItems={setScheduleItems}
+          transports={transports}
+        />;
       case 'expenses':
-        return <ExpenseView members={members} isEditable={true} currencies={tripConfig.currencies} />;
+        return <ExpenseView 
+          members={members} isEditable={true} currencies={tripConfig.currencies}
+          expenses={expenses} setExpenses={setExpenses}
+          exchangeRate={exchangeRate} setExchangeRate={setExchangeRate}
+        />;
       case 'shopping':
-        return <ShoppingView items={shoppingItems} setItems={setShoppingItems} members={members} isEditable={true} activeCurrencies={tripConfig.currencies} />;
+        return <ShoppingView 
+          items={shoppingItems} setItems={setShoppingItems} 
+          members={members} isEditable={true} activeCurrencies={tripConfig.currencies} 
+        />;
       case 'prep':
-        return <PrepView members={members} setMembers={setMembers} tripConfig={tripConfig} setTripConfig={setTripConfig} />;
+        return <PrepView 
+          members={members} setMembers={setMembers} 
+          tripConfig={tripConfig} setTripConfig={setTripConfig}
+          todo={todo} setTodo={setTodo}
+          packing={packing} setPacking={setPacking}
+          notes={notes} setNotes={setNotes}
+        />;
       default:
-        return <ItineraryView startDate={tripConfig.startDate} endDate={tripConfig.endDate} />;
+        return null;
     }
   };
 

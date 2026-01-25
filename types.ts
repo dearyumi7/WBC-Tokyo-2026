@@ -26,8 +26,8 @@ export interface Flight {
   date: string;
   note?: string;
   baggage?: string;
-  seat?: string; // We'll use a formatted string or simple text for multiple seats
-  memberSeats?: Record<string, string>; // memberId -> seatNumber
+  seat?: string;
+  memberSeats?: Record<string, string>;
 }
 
 export interface TransportTransfer {
@@ -52,7 +52,7 @@ export interface Transport {
   note?: string;
   price?: number;
   currency?: 'JPY' | 'TWD' | string;
-  memberSeats?: Record<string, { type: string, seat: string }>; // memberId -> { type, seat }
+  memberSeats?: Record<string, { type: string, seat: string }>;
   transfers?: TransportTransfer[];
 }
 
@@ -92,13 +92,23 @@ export interface Restaurant {
   iconType?: string;
 }
 
-export interface ItineraryItem {
+export interface CustomDetail {
+  id: string;
+  title: string;
+  content: string;
+}
+
+export interface ScheduleItem {
   id: string;
   time: string;
-  location: string;
-  address: string;
-  note: string;
-  type: 'visit' | 'food' | 'transport';
+  event: string;
+  addr: string;
+  type: string;
+  plannedTransport?: Partial<Transport>;
+  customNote?: string;
+  price?: number;
+  currency?: 'JPY' | 'TWD' | string;
+  customDetails?: CustomDetail[];
 }
 
 export interface Transaction {
@@ -134,4 +144,9 @@ export interface ChecklistItem {
   id: string;
   text: string;
   checked: boolean;
+}
+
+export interface NoteItem {
+  id: string;
+  content: string;
 }
