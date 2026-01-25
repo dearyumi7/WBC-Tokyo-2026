@@ -1,6 +1,5 @@
 {
   "hosting": {
-    "site": "tokyo-wbc-shared",
     "public": "dist",
     "ignore": [
       "firebase.json",
