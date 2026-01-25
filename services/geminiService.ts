@@ -1,4 +1,6 @@
-import { GoogleGenAI, Type } from "https://esm.sh/@google/genai@1.38.0";
+
+// Fix: Use correct import for GoogleGenAI
+import { GoogleGenAI, Type } from "@google/genai";
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
@@ -8,6 +10,7 @@ export const getTravelSuggestions = async (prompt: string) => {
       model: 'gemini-3-flash-preview',
       contents: `You are a Tokyo travel expert. A user is going to Tokyo for the WBC. ${prompt}. Give a concise suggestion in Traditional Chinese.`,
     });
+    // Fix: Correctly access the text property as a string
     return response.text;
   } catch (error) {
     console.error("Gemini Error:", error);
@@ -67,7 +70,9 @@ export const getSpotDetails = async (spotName: string, address: string): Promise
       }
     });
 
-    return JSON.parse(response.text);
+    // Fix: Properly handle and trim JSON response text
+    const jsonStr = response.text?.trim() || "{}";
+    return JSON.parse(jsonStr);
   } catch (error) {
     console.error("Gemini Detail Error:", error);
     return null;

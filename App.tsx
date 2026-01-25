@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'https://esm.sh/react@19.2.3';
-import { Plane, Hotel, Ticket as TicketIcon, Utensils, Calendar, Wallet, ShoppingBag, ClipboardList, Users } from 'https://esm.sh/lucide-react@0.563.0';
+import { Plane, Hotel, Ticket as TicketIcon, Utensils, Calendar, Wallet, ShoppingBag, ClipboardList, Users, Globe, Check, ShieldCheck, ExternalLink } from 'https://esm.sh/lucide-react@0.563.0';
 import { doc, onSnapshot, setDoc, updateDoc } from 'https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js';
 import { db } from './firebase.ts';
 import { TabType, Flight, Transport, Accommodation, Ticket, Restaurant, Member, ShoppingItem, TripConfig, ScheduleItem, Transaction, ChecklistItem, NoteItem } from './types.ts';
@@ -105,7 +105,6 @@ const App: React.FC = () => {
   // --- Firestore 監聽器 ---
   useEffect(() => {
     const unsubscribe = onSnapshot(tripDocRef, (snap) => {
-      // 忽略本地產生的變動，避免 UI 抖動
       if (snap.metadata.hasPendingWrites) return;
 
       if (snap.exists()) {
@@ -126,7 +125,6 @@ const App: React.FC = () => {
         if (cloud.packing) setPacking(cloud.packing);
         if (cloud.notes) setNotes(cloud.notes);
         
-        // 短暫鎖定以避免 setDoc 觸發循環
         setTimeout(() => { isCloudUpdate.current = false; }, 300);
       }
       setHasLoaded(true);
@@ -141,13 +139,12 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!hasLoaded || isCloudUpdate.current) return;
     
-    // 行程內容發生變化時立即同步至雲端
     updateDoc(tripDocRef, { scheduleItems }).catch(err => {
       console.error("Immediate Itinerary Sync Error:", err);
     });
   }, [scheduleItems, hasLoaded]);
 
-  // --- 其他資料類別的自動儲存機制（帶延遲以減少寫入頻率） ---
+  // --- 其他資料類別的自動儲存機制 ---
   useEffect(() => {
     if (!hasLoaded || isCloudUpdate.current) return;
 
@@ -192,13 +189,17 @@ const App: React.FC = () => {
           members={members} isEditable={true} activeCurrencies={tripConfig.currencies} 
         />;
       case 'prep':
-        return <PrepView 
-          members={members} setMembers={setMembers} 
-          tripConfig={tripConfig} setTripConfig={setTripConfig}
-          todo={todo} setTodo={setTodo}
-          packing={packing} setPacking={setPacking}
-          notes={notes} setNotes={setNotes}
-        />;
+        return (
+          <div className="space-y-6">
+            <PrepView 
+              members={members} setMembers={setMembers} 
+              tripConfig={tripConfig} setTripConfig={setTripConfig}
+              todo={todo} setTodo={setTodo}
+              packing={packing} setPacking={setPacking}
+              notes={notes} setNotes={setNotes}
+            />
+          </div>
+        );
       default:
         return null;
     }
