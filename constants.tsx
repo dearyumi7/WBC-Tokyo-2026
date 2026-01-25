@@ -12,8 +12,6 @@ export const COLORS = {
 
 export const DEFAULT_FLIGHTS: Flight[] = [
   {
-    // Fix: Added missing required id property
-    id: 'default-flight-1',
     date: '2026/03/05',
     airline: '中華航空',
     flightNo: 'CI 0154',
@@ -28,8 +26,6 @@ export const DEFAULT_FLIGHTS: Flight[] = [
     note: '請於3/4前預訂餐點，並開始預約自動報到'
   },
   {
-    // Fix: Added missing required id property
-    id: 'default-flight-2',
     date: '2026/03/10',
     airline: '中華航空',
     flightNo: 'CI 0173',

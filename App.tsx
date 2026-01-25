@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Plane, Hotel, Ticket as TicketIcon, Utensils, Calendar, Wallet, ShoppingBag, ClipboardList, Users, Loader2 } from 'lucide-react';
-import { collection, onSnapshot, doc, setDoc, deleteDoc, updateDoc, query, orderBy } from 'firebase/firestore';
-import { db } from './firebase';
+import { Plane, Hotel, Ticket as TicketIcon, Utensils, Calendar, Wallet, ShoppingBag, ClipboardList, Users } from 'lucide-react';
 import { TabType, Flight, Transport, Accommodation, Ticket, Restaurant, Member, ShoppingItem } from './types';
+import { COLORS, DEFAULT_FLIGHTS, EXCHANGE_RATE } from './constants';
 import BookingView from './components/BookingView';
 import ItineraryView from './components/ItineraryView';
 import ExpenseView from './components/ExpenseView';
@@ -10,83 +9,111 @@ import ShoppingView from './components/ShoppingView';
 import PrepView from './components/PrepView';
 
 const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<TabType>('itinerary');
-  const [isLoading, setIsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<TabType>('itinerary'); // Set default to itinerary
 
-  // Firestore States
-  const [members, setMembers] = useState<Member[]>([]);
-  const [flights, setFlights] = useState<Flight[]>([]);
-  const [transports, setTransports] = useState<Transport[]>([]);
-  const [hotels, setHotels] = useState<Accommodation[]>([]);
-  const [tickets, setTickets] = useState<Ticket[]>([]);
-  const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
-  const [shoppingItems, setShoppingItems] = useState<ShoppingItem[]>([]);
+  // State Management
+  const [members, setMembers] = useState<Member[]>([
+    { id: '1', name: 'Yumi', color: 'bg-blue-500' },
+    { id: '2', name: 'Ping', color: 'bg-pink-500' }
+  ]);
 
-  // Real-time Listeners
-  useEffect(() => {
-    const unsubscribes = [
-      onSnapshot(collection(db, 'members'), (s) => setMembers(s.docs.map(d => ({ id: d.id, ...d.data() } as Member)))),
-      onSnapshot(collection(db, 'booking_flights'), (s) => setFlights(s.docs.map(d => ({ id: d.id, ...d.data() } as Flight)))),
-      onSnapshot(collection(db, 'booking_transports'), (s) => setTransports(s.docs.map(d => ({ id: d.id, ...d.data() } as Transport)))),
-      onSnapshot(collection(db, 'booking_hotels'), (s) => setHotels(s.docs.map(d => ({ id: d.id, ...d.data() } as Accommodation)))),
-      onSnapshot(collection(db, 'booking_tickets'), (s) => setTickets(s.docs.map(d => ({ id: d.id, ...d.data() } as Ticket)))),
-      onSnapshot(collection(db, 'booking_restaurants'), (s) => setRestaurants(s.docs.map(d => ({ id: d.id, ...d.data() } as Restaurant)))),
-      onSnapshot(collection(db, 'shopping'), (s) => setShoppingItems(s.docs.map(d => ({ id: d.id, ...d.data() } as ShoppingItem)))),
-    ];
+  const [flights, setFlights] = useState<Flight[]>(DEFAULT_FLIGHTS);
+  const [transports, setTransports] = useState<Transport[]>([
+    {
+      type: '新幹線',
+      name: 'NOZOMI226',
+      date: '2026/03/06',
+      from: '名古屋',
+      to: '東京',
+      departureTime: '10:06',
+      arrivalTime: '11:45',
+      duration: '1小時39分',
+      seatInfo: '',
+      note: '請將行李置於座位後方',
+      memberSeats: {
+        '1': { type: '指定席', seat: '6車 12-A' },
+        '2': { type: '指定席', seat: '6車 12-B' }
+      }
+    }
+  ]);
+  const [hotels, setHotels] = useState<Accommodation[]>([
+    {
+      name: 'Comfort Hotel Nagoya Meiekiminami',
+      address: '1 Chome-14-16 Meiekiminami, Nakamura Ward, Nagoya, Aichi 450-0003, Japan',
+      checkIn: '2026/03/05 15:00',
+      checkOut: '2026/03/10 10:00',
+      dates: '2026/03/05 - 2026/03/10',
+      price: 25000,
+      image: 'https://picsum.photos/800/400?random=1'
+    }
+  ]);
+  const [tickets, setTickets] = useState<Ticket[]>([
+    {
+      id: 't1',
+      category: '球賽票券',
+      event: 'WBC Pool C',
+      date: '2026/03/06',
+      time: '19:00',
+      teams: 'Japan vs Chinese Taipei',
+      section: 'A44',
+      row: '14',
+      seat: '389 & 390',
+      notes: '',
+      iconType: 'trophy'
+    },
+    {
+      id: 't2',
+      category: '球賽票券',
+      event: 'WBC Pool C',
+      date: '2026/03/07',
+      time: '12:00',
+      teams: 'Czechia vs Chinese Taipei',
+      section: 'D12',
+      row: '5',
+      seat: '290 & 291',
+      location: 'Tokyo Dome',
+      notes: '',
+      iconType: 'trophy'
+    },
+    {
+      id: 't3',
+      category: '景點票券',
+      event: 'SHIBUYA SKY 展望台',
+      date: '2026/03/06',
+      time: '16:30',
+      location: 'Shibuya Scramble Square',
+      notes: '請提前 15 分鐘抵達 14 樓入口',
+      iconType: 'camera'
+    }
+  ]);
+  const [restaurants, setRestaurants] = useState<Restaurant[]>([
+    { 
+      name: 'Peter Luger Steak House', 
+      date: '2026/03/06', 
+      time: '13:15',
+      address: '日本〒150-0013 Tokyo, Shibuya, Ebisu, 4 Chome−19−19 Peter Luger Steak House Tokyo',
+      reservedDishes: '平日午間套餐*2',
+      note: '不收現金',
+      iconType: 'steak'
+    }
+  ]);
 
-    // Initial load check (simulated)
-    setTimeout(() => setIsLoading(false), 1000);
-
-    return () => unsubscribes.forEach(unsub => unsub());
-  }, []);
-
-  // Sync Functions (Wrappers to replace useState setters)
-  const syncItems = (collectionName: string) => async (items: any[] | ((prev: any[]) => any[])) => {
-    // Note: This is a simplified version for small datasets. 
-    // In production, we should call addDoc/updateDoc/deleteDoc directly in components.
-    // For now, we will handle the logic where components call these proxy functions.
-  };
-
-  const handleUpdateFirestore = (collectionName: string) => async (newItems: any) => {
-    // If it's a function (from React state update), we can't easily sync without knowing which ID changed.
-    // So we'll pass direct CRUD functions to components instead in a real scenario.
-    // To minimize changes to existing components, we'll implement a simple "last-one-wins" collection sync 
-    // if passed an array, OR let the components handle their specific Firestore calls.
-  };
+  const [shoppingItems, setShoppingItems] = useState<ShoppingItem[]>([
+    { id: '1', name: 'WBC 紀念球衣', category: '服飾', quantity: 1, note: 'XL號 藍色', jpyPrice: 12000, twdPrice: 3200, checked: false, memberId: '1' },
+    { id: '2', name: '大谷翔平簽名球', category: '週邊', quantity: 1, note: '如果還有貨的話', jpyPrice: 5000, twdPrice: 1500, checked: true, memberId: '1' },
+    { id: '3', name: '合利他命 EX Plus', category: '藥品', quantity: 3, note: '幫家人帶', jpyPrice: 6500, twdPrice: 2200, checked: false, memberId: '2' },
+    { id: '4', name: '一蘭拉麵包', category: '食品', quantity: 2, note: '機場買', jpyPrice: 2000, twdPrice: 550, checked: false, memberId: '2' },
+  ]);
 
   const renderContent = () => {
-    if (isLoading) {
-      return (
-        <div className="h-full flex flex-col items-center justify-center text-slate-400 gap-4">
-          <Loader2 className="animate-spin text-blue-500" size={40} />
-          <p className="font-bold text-sm tracking-widest uppercase">Syncing with Tokyo...</p>
-        </div>
-      );
-    }
-
     switch (activeTab) {
       case 'booking':
         return <BookingView 
-          flights={flights} setFlights={(val: any) => {
-            const list = typeof val === 'function' ? val(flights) : val;
-            list.forEach((item: any) => setDoc(doc(db, 'booking_flights', item.id || Date.now().toString()), item));
-          }}
-          transports={transports} setTransports={(val: any) => {
-            const list = typeof val === 'function' ? val(transports) : val;
-            list.forEach((item: any) => setDoc(doc(db, 'booking_transports', item.id || Date.now().toString()), item));
-          }}
-          hotels={hotels} setHotels={(val: any) => {
-            const list = typeof val === 'function' ? val(hotels) : val;
-            list.forEach((item: any) => setDoc(doc(db, 'booking_hotels', item.id || Date.now().toString()), item));
-          }}
-          tickets={tickets} setTickets={(val: any) => {
-            const list = typeof val === 'function' ? val(tickets) : val;
-            list.forEach((item: any) => setDoc(doc(db, 'booking_tickets', item.id || Date.now().toString()), item));
-          }}
-          restaurants={restaurants} setRestaurants={(val: any) => {
-            const list = typeof val === 'function' ? val(restaurants) : val;
-            list.forEach((item: any) => setDoc(doc(db, 'booking_restaurants', item.id || Date.now().toString()), item));
-          }}
+          flights={flights} setFlights={setFlights}
+          transports={transports} setTransports={setTransports}
+          hotels={hotels} setHotels={setHotels}
+          tickets={tickets} setTickets={setTickets}
+          restaurants={restaurants} setRestaurants={setRestaurants}
           members={members}
         />;
       case 'itinerary':
@@ -94,25 +121,11 @@ const App: React.FC = () => {
       case 'expenses':
         return <ExpenseView members={members} />;
       case 'shopping':
-        return <ShoppingView 
-          items={shoppingItems} 
-          setItems={(val: any) => {
-            const list = typeof val === 'function' ? val(shoppingItems) : val;
-            // Check for deletions by comparing IDs or handle specifically
-            list.forEach((item: any) => setDoc(doc(db, 'shopping', item.id), item));
-          }} 
-          members={members} 
-        />;
+        return <ShoppingView items={shoppingItems} setItems={setShoppingItems} members={members} />;
       case 'prep':
-        return <PrepView 
-          members={members} 
-          setMembers={(val: any) => {
-            const list = typeof val === 'function' ? val(members) : val;
-            list.forEach((item: any) => setDoc(doc(db, 'members', item.id), item));
-          }} 
-        />;
+        return <PrepView members={members} setMembers={setMembers} />;
       default:
-        return <div />;
+        return <ItineraryView transports={transports} />;
     }
   };
 
