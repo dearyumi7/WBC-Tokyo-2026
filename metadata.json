@@ -1,0 +1,7 @@
+{
+  "name": "Tokyo WBC Travel Planner",
+  "description": "A minimalist, mobile-first travel management application for fans attending the World Baseball Classic in Tokyo. Features booking management, itinerary planning with weather integration, expense tracking with bill splitting, shopping checklists, and travel preparation tools.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
