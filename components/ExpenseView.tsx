@@ -1,10 +1,12 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { Wallet, Repeat, Plus, Users, Landmark, X, Check, Calendar, MapPin, Tag, CreditCard, Lock, LockOpen } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'https://esm.sh/react@19.2.3';
+import { Wallet, Repeat, Plus, Users, Landmark, X, Check, Calendar, MapPin, Tag, CreditCard, Lock, LockOpen } from 'https://esm.sh/lucide-react@0.563.0';
 import { EXCHANGE_RATE as DEFAULT_RATE } from '../constants';
 import { Member, Transaction } from '../types';
 
 interface ExpenseViewProps {
   members: Member[];
+  isEditable: boolean;
+  currencies: string[];
 }
 
 const CATEGORIES = [
@@ -16,8 +18,7 @@ const CATEGORIES = [
   { label: '其他', icon: '✨' },
 ];
 
-const ExpenseView: React.FC<ExpenseViewProps> = ({ members }) => {
-  // Persistence for Exchange Rate
+const ExpenseView: React.FC<ExpenseViewProps> = ({ members, isEditable, currencies }) => {
   const [exchangeRate, setExchangeRate] = useState<string>(() => {
     const saved = localStorage.getItem('tokyo_wbc_exchange_rate');
     return saved !== null ? saved : DEFAULT_RATE.toString();
@@ -26,8 +27,7 @@ const ExpenseView: React.FC<ExpenseViewProps> = ({ members }) => {
     return localStorage.getItem('tokyo_wbc_rate_locked') === 'true';
   });
 
-  // State for bill splitting currency toggle
-  const [splitCurrency, setSplitCurrency] = useState<'JPY' | 'TWD'>('JPY');
+  const [splitCurrency, setSplitCurrency] = useState<string>(currencies[0] || 'JPY');
 
   useEffect(() => {
     localStorage.setItem('tokyo_wbc_exchange_rate', exchangeRate);
@@ -44,7 +44,7 @@ const ExpenseView: React.FC<ExpenseViewProps> = ({ members }) => {
   const [formData, setFormData] = useState<Partial<Transaction>>({
     date: new Date().toISOString().split('T')[0],
     category: '美食',
-    currency: 'JPY',
+    currency: currencies[0] || 'JPY',
     amount: 0,
     location: '',
     payer: members[0]?.id || '',
@@ -66,7 +66,6 @@ const ExpenseView: React.FC<ExpenseViewProps> = ({ members }) => {
 
   const totalTwdTotal = (totalJpy * effectiveRate) + totalTwdDirect;
 
-  // Real bill splitting logic based on balances (Paid - Owed)
   const memberBalancesJpy = useMemo(() => {
     const balances: Record<string, number> = {};
     members.forEach(m => balances[m.id] = 0);
@@ -74,12 +73,10 @@ const ExpenseView: React.FC<ExpenseViewProps> = ({ members }) => {
     expenses.forEach(e => {
       const jpyAmount = e.currency === 'JPY' ? e.amount : e.amount / effectiveRate;
       
-      // Add to payer's paid total
       if (balances[e.payer] !== undefined) {
         balances[e.payer] += jpyAmount;
       }
 
-      // Subtract from each split participant's balance
       const participants = e.splitWith || members.map(m => m.id);
       if (participants.length > 0) {
         const share = jpyAmount / participants.length;
@@ -93,7 +90,6 @@ const ExpenseView: React.FC<ExpenseViewProps> = ({ members }) => {
     return balances;
   }, [expenses, members, effectiveRate]);
 
-  // For display of "Who paid how much" in JPY
   const memberPaidJpy = useMemo(() => {
     const paid: Record<string, number> = {};
     members.forEach(m => paid[m.id] = 0);
@@ -113,9 +109,13 @@ const ExpenseView: React.FC<ExpenseViewProps> = ({ members }) => {
     return splitCurrency === 'JPY' ? jpyAmount : jpyAmount * effectiveRate;
   };
 
-  const currencySymbol = splitCurrency === 'JPY' ? '¥' : '$';
+  const getCurrencySymbol = (code: string) => {
+    if (code === 'JPY') return '¥';
+    if (code === 'EUR') return '€';
+    if (code === 'KRW') return '₩';
+    return '$';
+  };
 
-  // Settlement Path Calculation (Based on balances)
   const settlementPaths = useMemo(() => {
     if (members.length < 2) return [];
 
@@ -142,7 +142,7 @@ const ExpenseView: React.FC<ExpenseViewProps> = ({ members }) => {
 
       if (amountToPayJpy > 0.1) {
         const displayAmount = getDisplaySplitAmount(amountToPayJpy);
-        paths.push(`${debtor.name} 支付給 ${creditor.name} ${currencySymbol}${Math.round(displayAmount).toLocaleString()}`);
+        paths.push(`${debtor.name} 支付給 ${creditor.name} ${getCurrencySymbol(splitCurrency)}${Math.round(displayAmount).toLocaleString()}`);
       }
 
       creditor.balance -= amountToPayJpy;
@@ -153,7 +153,7 @@ const ExpenseView: React.FC<ExpenseViewProps> = ({ members }) => {
     }
 
     return paths;
-  }, [members, memberBalancesJpy, splitCurrency, effectiveRate, currencySymbol]);
+  }, [members, memberBalancesJpy, splitCurrency, effectiveRate]);
 
   const handleAddExpense = () => {
     if (!formData.amount || !formData.location || !formData.payer) return;
@@ -178,7 +178,7 @@ const ExpenseView: React.FC<ExpenseViewProps> = ({ members }) => {
     setFormData({
       date: new Date().toISOString().split('T')[0],
       category: '美食',
-      currency: 'JPY',
+      currency: currencies[0] || 'JPY',
       amount: 0,
       location: '',
       payer: members[0]?.id || '',
@@ -197,7 +197,6 @@ const ExpenseView: React.FC<ExpenseViewProps> = ({ members }) => {
 
   return (
     <div className="space-y-6 pt-4 pb-12">
-      {/* Total Overview Card - Gray + White + Blue */}
       <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-200 relative overflow-hidden">
         <div className="absolute top-0 right-0 p-8 opacity-5 text-slate-200">
           <Landmark size={120} />
@@ -247,7 +246,6 @@ const ExpenseView: React.FC<ExpenseViewProps> = ({ members }) => {
         </div>
       </div>
 
-      {/* Bill Splitting Section */}
       <section>
         <div className="flex flex-col gap-3 mb-3 px-2">
           <div className="flex justify-between items-center">
@@ -256,22 +254,19 @@ const ExpenseView: React.FC<ExpenseViewProps> = ({ members }) => {
               分帳明細
             </h2>
             <div className="flex bg-slate-100 p-1 rounded-xl">
-              <button 
-                onClick={() => setSplitCurrency('JPY')}
-                className={`px-3 py-1 text-[10px] font-black rounded-lg transition-all ${splitCurrency === 'JPY' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400'}`}
-              >
-                JPY
-              </button>
-              <button 
-                onClick={() => setSplitCurrency('TWD')}
-                className={`px-3 py-1 text-[10px] font-black rounded-lg transition-all ${splitCurrency === 'TWD' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400'}`}
-              >
-                TWD
-              </button>
+              {currencies.map(c => (
+                <button 
+                  key={c}
+                  onClick={() => setSplitCurrency(c)}
+                  className={`px-3 py-1 text-[10px] font-black rounded-lg transition-all ${splitCurrency === c ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400'}`}
+                >
+                  {c}
+                </button>
+              ))}
             </div>
           </div>
           <div className="text-[10px] font-bold text-slate-400 bg-white/50 border border-slate-100 px-3 py-1 rounded-full w-fit">
-            平均 {currencySymbol}{Math.round(getDisplaySplitAmount(averageSpendingJpy)).toLocaleString()} / 人 (僅供參考)
+            平均 {getCurrencySymbol(splitCurrency)}{Math.round(getDisplaySplitAmount(averageSpendingJpy)).toLocaleString()} / 人 (僅供參考)
           </div>
         </div>
         <div className="grid grid-cols-2 gap-4">
@@ -279,7 +274,7 @@ const ExpenseView: React.FC<ExpenseViewProps> = ({ members }) => {
             <div key={member.id} className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm">
               <div className="text-[10px] text-slate-400 font-bold uppercase mb-1">{member.name}</div>
               <div className="text-[10px] text-slate-300 font-bold uppercase">總支付</div>
-              <div className="text-lg font-black text-slate-800">{currencySymbol} {Math.round(getDisplaySplitAmount(memberPaidJpy[member.id] || 0)).toLocaleString()}</div>
+              <div className="text-lg font-black text-slate-800">{getCurrencySymbol(splitCurrency)} {Math.round(getDisplaySplitAmount(memberPaidJpy[member.id] || 0)).toLocaleString()}</div>
             </div>
           ))}
         </div>
@@ -289,7 +284,7 @@ const ExpenseView: React.FC<ExpenseViewProps> = ({ members }) => {
                <div className="p-1.5 bg-blue-50 rounded-lg">
                  <Repeat size={14} className="text-blue-600" />
                </div>
-               結算建議 ({splitCurrency === 'JPY' ? '日幣' : '台幣'}基準)
+               結算建議 ({splitCurrency} 基準)
              </div>
              <div className="space-y-2">
                {settlementPaths.map((path, idx) => (
@@ -303,7 +298,6 @@ const ExpenseView: React.FC<ExpenseViewProps> = ({ members }) => {
         )}
       </section>
 
-      {/* Transactions List */}
       <section>
         <div className="flex justify-between items-center mb-3 px-2">
           <h2 className="text-lg font-bold">帳務明細</h2>
@@ -336,10 +330,10 @@ const ExpenseView: React.FC<ExpenseViewProps> = ({ members }) => {
                 </div>
                 <div className="text-right shrink-0">
                   <div className="font-black text-lg text-slate-900">
-                    {exp.currency === 'JPY' ? '¥' : '$'}{exp.amount.toLocaleString()}
+                    {getCurrencySymbol(exp.currency)}{exp.amount.toLocaleString()}
                   </div>
                   <div className="text-[10px] text-slate-400 font-bold">
-                    {exp.currency === 'JPY' ? `≈ NT$ ${Math.round(exp.amount * effectiveRate).toLocaleString()}` : `≈ ¥ ${Math.round(exp.amount / effectiveRate).toLocaleString()}`}
+                    {exp.currency === 'JPY' ? `≈ NT$ ${Math.round(exp.amount * effectiveRate).toLocaleString()}` : (exp.currency === 'TWD' ? `≈ ¥ ${Math.round(exp.amount / effectiveRate).toLocaleString()}` : '')}
                   </div>
                 </div>
               </div>
@@ -353,7 +347,6 @@ const ExpenseView: React.FC<ExpenseViewProps> = ({ members }) => {
         </div>
       </section>
 
-      {/* Add Expense Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-end justify-center px-4 pb-4">
           <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setIsModalOpen(false)}></div>
@@ -413,19 +406,16 @@ const ExpenseView: React.FC<ExpenseViewProps> = ({ members }) => {
                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">
                       幣別
                     </label>
-                    <div className="flex bg-slate-100 p-1 rounded-2xl">
-                      <button 
-                        onClick={() => setFormData({...formData, currency: 'JPY'})}
-                        className={`flex-1 py-2 rounded-xl text-xs font-black transition-all ${formData.currency === 'JPY' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400'}`}
-                      >
-                        JPY
-                      </button>
-                      <button 
-                        onClick={() => setFormData({...formData, currency: 'TWD'})}
-                        className={`flex-1 py-2 rounded-xl text-xs font-black transition-all ${formData.currency === 'TWD' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400'}`}
-                      >
-                        TWD
-                      </button>
+                    <div className="flex bg-slate-100 p-1 rounded-2xl overflow-x-auto hide-scrollbar">
+                      {currencies.map(c => (
+                        <button 
+                          key={c}
+                          onClick={() => setFormData({...formData, currency: c})}
+                          className={`flex-1 py-2 px-3 rounded-xl text-xs font-black transition-all whitespace-nowrap ${formData.currency === c ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400'}`}
+                        >
+                          {c}
+                        </button>
+                      ))}
                     </div>
                   </div>
                   <div className="col-span-2 space-y-1">

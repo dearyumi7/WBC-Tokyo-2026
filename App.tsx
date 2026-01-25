@@ -1,15 +1,31 @@
-import React, { useState, useEffect } from 'react';
-import { Plane, Hotel, Ticket as TicketIcon, Utensils, Calendar, Wallet, ShoppingBag, ClipboardList, Users } from 'lucide-react';
-import { TabType, Flight, Transport, Accommodation, Ticket, Restaurant, Member, ShoppingItem } from './types';
-import { COLORS, DEFAULT_FLIGHTS, EXCHANGE_RATE } from './constants';
-import BookingView from './components/BookingView';
-import ItineraryView from './components/ItineraryView';
-import ExpenseView from './components/ExpenseView';
-import ShoppingView from './components/ShoppingView';
-import PrepView from './components/PrepView';
+import React, { useState, useEffect } from 'https://esm.sh/react@19.2.3';
+import { Plane, Hotel, Ticket as TicketIcon, Utensils, Calendar, Wallet, ShoppingBag, ClipboardList, Users } from 'https://esm.sh/lucide-react@0.563.0';
+import { TabType, Flight, Transport, Accommodation, Ticket, Restaurant, Member, ShoppingItem, TripConfig } from './types.ts';
+import { COLORS, DEFAULT_FLIGHTS, EXCHANGE_RATE } from './constants.tsx';
+import BookingView from './components/BookingView.tsx';
+import ItineraryView from './components/ItineraryView.tsx';
+import ExpenseView from './components/ExpenseView.tsx';
+import ShoppingView from './components/ShoppingView.tsx';
+import PrepView from './components/PrepView.tsx';
 
 const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<TabType>('itinerary'); // Set default to itinerary
+  const [activeTab, setActiveTab] = useState<TabType>('itinerary');
+
+  // Trip Configuration State
+  const [tripConfig, setTripConfig] = useState<TripConfig>(() => {
+    const saved = localStorage.getItem('tokyo_wbc_trip_config');
+    if (saved) return JSON.parse(saved);
+    return {
+      name: 'WBC Tokyo 2026',
+      startDate: '2026-03-05',
+      endDate: '2026-03-10',
+      currencies: ['JPY', 'TWD']
+    };
+  });
+
+  useEffect(() => {
+    localStorage.setItem('tokyo_wbc_trip_config', JSON.stringify(tripConfig));
+  }, [tripConfig]);
 
   // State Management
   const [members, setMembers] = useState<Member[]>([
@@ -99,10 +115,10 @@ const App: React.FC = () => {
   ]);
 
   const [shoppingItems, setShoppingItems] = useState<ShoppingItem[]>([
-    { id: '1', name: 'WBC 紀念球衣', category: '服飾', quantity: 1, note: 'XL號 藍色', jpyPrice: 12000, twdPrice: 3200, checked: false, memberId: '1' },
-    { id: '2', name: '大谷翔平簽名球', category: '週邊', quantity: 1, note: '如果還有貨的話', jpyPrice: 5000, twdPrice: 1500, checked: true, memberId: '1' },
-    { id: '3', name: '合利他命 EX Plus', category: '藥品', quantity: 3, note: '幫家人帶', jpyPrice: 6500, twdPrice: 2200, checked: false, memberId: '2' },
-    { id: '4', name: '一蘭拉麵包', category: '食品', quantity: 2, note: '機場買', jpyPrice: 2000, twdPrice: 550, checked: false, memberId: '2' },
+    { id: '1', name: 'WBC 紀念球衣', category: '服飾', quantity: 1, note: 'XL號 藍色', jpyPrice: 12000, twdPrice: 3200, checked: false, memberId: '1', location: 'Tokyo Dome' },
+    { id: '2', name: '大谷翔平簽名球', category: '週邊', quantity: 1, note: '如果還有貨的話', jpyPrice: 5000, twdPrice: 1500, checked: true, memberId: '1', location: 'Tokyo Dome' },
+    { id: '3', name: '合利他命 EX Plus', category: '藥品', quantity: 3, note: '幫家人帶', jpyPrice: 6500, twdPrice: 2200, checked: false, memberId: '2', location: '藥妝店' },
+    { id: '4', name: '一蘭拉麵包', category: '食品', quantity: 2, note: '機場買', jpyPrice: 2000, twdPrice: 550, checked: false, memberId: '2', location: '機場' },
   ]);
 
   const renderContent = () => {
@@ -115,17 +131,18 @@ const App: React.FC = () => {
           tickets={tickets} setTickets={setTickets}
           restaurants={restaurants} setRestaurants={setRestaurants}
           members={members}
+          isEditable={true}
         />;
       case 'itinerary':
-        return <ItineraryView transports={transports} />;
+        return <ItineraryView startDate={tripConfig.startDate} endDate={tripConfig.endDate} />;
       case 'expenses':
-        return <ExpenseView members={members} />;
+        return <ExpenseView members={members} isEditable={true} currencies={tripConfig.currencies} />;
       case 'shopping':
-        return <ShoppingView items={shoppingItems} setItems={setShoppingItems} members={members} />;
+        return <ShoppingView items={shoppingItems} setItems={setShoppingItems} members={members} isEditable={true} activeCurrencies={tripConfig.currencies} />;
       case 'prep':
-        return <PrepView members={members} setMembers={setMembers} />;
+        return <PrepView members={members} setMembers={setMembers} tripConfig={tripConfig} setTripConfig={setTripConfig} />;
       default:
-        return <ItineraryView transports={transports} />;
+        return <ItineraryView startDate={tripConfig.startDate} endDate={tripConfig.endDate} />;
     }
   };
 
@@ -141,7 +158,7 @@ const App: React.FC = () => {
     <div className="flex flex-col h-screen bg-slate-100 text-slate-900">
       <header className="px-6 pt-12 pb-1 bg-white shadow-sm flex justify-between items-center shrink-0 z-30">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">WBC Tokyo 2026</h1>
+          <h1 className="text-2xl font-bold tracking-tight">{tripConfig.name}</h1>
         </div>
         <div className="flex -space-x-2">
           {members.map(m => (

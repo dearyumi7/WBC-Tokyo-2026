@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type } from "https://esm.sh/@google/genai@1.38.0";
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
@@ -16,10 +16,8 @@ export const getTravelSuggestions = async (prompt: string) => {
 };
 
 export const getWeather = async (date: string) => {
-  // Simulating weather fetch via Gemini or mock
-  // In a real app we'd use a weather API, here we simulate a smart response
   return {
-    temp: Math.floor(Math.random() * (15 - 5 + 1)) + 5, // Tokyo March temp 5-15C
+    temp: Math.floor(Math.random() * (15 - 5 + 1)) + 5,
     condition: 'Sunny'
   };
 };

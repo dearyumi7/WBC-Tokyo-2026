@@ -1,13 +1,15 @@
-import React, { useState } from 'react';
-import { ClipboardList, Briefcase, Phone, MessageSquare, Plus, CheckCircle2, Circle, ExternalLink, ShieldAlert, Users, Trash2, UserPlus, Info, Check, StickyNote, AlertTriangle, X, Palette, GripVertical } from 'lucide-react';
-import { Member } from '../types';
+import React, { useState } from 'https://esm.sh/react@19.2.3';
+import { ClipboardList, Briefcase, Phone, MessageSquare, Plus, CheckCircle2, Circle, ExternalLink, ShieldAlert, Users, Trash2, UserPlus, Info, Check, StickyNote, AlertTriangle, X, Palette, GripVertical, Settings, Globe, Calendar as CalendarIcon, Wallet } from 'https://esm.sh/lucide-react@0.563.0';
+import { Member, TripConfig } from '../types';
 
 interface PrepViewProps {
   members: Member[];
   setMembers: React.Dispatch<React.SetStateAction<Member[]>>;
+  tripConfig: TripConfig;
+  setTripConfig: React.Dispatch<React.SetStateAction<TripConfig>>;
 }
 
-type PrepTab = 'checklist' | 'emergency' | 'notes' | 'members';
+type PrepTab = 'checklist' | 'emergency' | 'notes' | 'members' | 'settings';
 
 const MEMBER_COLORS = [
   'bg-blue-500', 'bg-pink-500', 'bg-emerald-500', 'bg-amber-500', 
@@ -15,7 +17,16 @@ const MEMBER_COLORS = [
   'bg-orange-500', 'bg-teal-500', 'bg-rose-500', 'bg-cyan-500'
 ];
 
-const PrepView: React.FC<PrepViewProps> = ({ members, setMembers }) => {
+const CURRENCY_OPTIONS = [
+  { code: 'JPY', symbol: '¥', label: '日幣' },
+  { code: 'TWD', symbol: '$', label: '台幣' },
+  { code: 'USD', symbol: '$', label: '美金' },
+  { code: 'EUR', symbol: '€', label: '歐元' },
+  { code: 'HKD', symbol: '$', label: '港幣' },
+  { code: 'KRW', symbol: '₩', label: '韓元' },
+];
+
+const PrepView: React.FC<PrepViewProps> = ({ members, setMembers, tripConfig, setTripConfig }) => {
   const [activePrepTab, setActivePrepTab] = useState<PrepTab>('checklist');
   const [isEditingMembers, setIsEditingMembers] = useState(false);
   const [isEditingChecklist, setIsEditingChecklist] = useState(false);
@@ -125,11 +136,24 @@ const PrepView: React.FC<PrepViewProps> = ({ members, setMembers }) => {
     setNotes(notes.filter(n => n.id !== id));
   };
 
+  const toggleCurrency = (code: string) => {
+    setTripConfig(prev => {
+      const currencies = [...prev.currencies];
+      if (currencies.includes(code)) {
+        if (currencies.length <= 1) return prev; // Keep at least one
+        return { ...prev, currencies: currencies.filter(c => c !== code) };
+      } else {
+        return { ...prev, currencies: [...currencies, code] };
+      }
+    });
+  };
+
   const tabs: { id: PrepTab; label: string; icon: any }[] = [
     { id: 'checklist', label: '清單', icon: ClipboardList },
     { id: 'emergency', label: '緊急', icon: ShieldAlert },
     { id: 'notes', label: '筆記', icon: StickyNote },
     { id: 'members', label: '成員', icon: Users },
+    { id: 'settings', label: '設定', icon: Settings },
   ];
 
   return (
@@ -146,6 +170,90 @@ const PrepView: React.FC<PrepViewProps> = ({ members, setMembers }) => {
           </button>
         ))}
       </div>
+
+      {/* Settings View */}
+      {activePrepTab === 'settings' && (
+        <div className="space-y-6 animate-in fade-in slide-in-from-right duration-300">
+          <section className="bg-white rounded-[2.5rem] p-6 border border-slate-200 shadow-sm space-y-6">
+            <div className="flex items-center gap-2 px-1">
+              <div className="p-2 bg-blue-50 rounded-xl text-blue-600"><Globe size={20} /></div>
+              <h3 className="text-lg font-black text-slate-800">基本設定</h3>
+            </div>
+
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">旅行名稱</label>
+                <input 
+                  placeholder="輸入旅行名稱..." 
+                  value={tripConfig.name}
+                  onChange={(e) => setTripConfig(prev => ({ ...prev, name: e.target.value }))}
+                  className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 text-sm font-bold focus:ring-2 focus:ring-blue-500" 
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1">
+                    <CalendarIcon size={10} /> 開始日期
+                  </label>
+                  <input 
+                    type="date"
+                    value={tripConfig.startDate}
+                    onChange={(e) => setTripConfig(prev => ({ ...prev, startDate: e.target.value }))}
+                    className="w-full bg-slate-50 border-none rounded-2xl px-4 py-4 text-xs font-bold focus:ring-2 focus:ring-blue-500" 
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1">
+                    <CalendarIcon size={10} /> 結束日期
+                  </label>
+                  <input 
+                    type="date"
+                    value={tripConfig.endDate}
+                    onChange={(e) => setTripConfig(prev => ({ ...prev, endDate: e.target.value }))}
+                    className="w-full bg-slate-50 border-none rounded-2xl px-4 py-4 text-xs font-bold focus:ring-2 focus:ring-blue-500" 
+                  />
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="bg-white rounded-[2.5rem] p-6 border border-slate-200 shadow-sm space-y-6">
+            <div className="flex items-center gap-2 px-1">
+              <div className="p-2 bg-blue-50 rounded-xl text-blue-600"><Wallet size={20} /></div>
+              <h3 className="text-lg font-black text-slate-800">幣別同步設定</h3>
+            </div>
+            
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight px-1 -mt-4">
+              勾選的幣別會顯示在記帳與購物頁面中
+            </p>
+
+            <div className="grid grid-cols-2 gap-3">
+              {CURRENCY_OPTIONS.map(curr => (
+                <button
+                  key={curr.code}
+                  onClick={() => toggleCurrency(curr.code)}
+                  className={`flex items-center justify-between p-4 rounded-3xl border transition-all ${
+                    tripConfig.currencies.includes(curr.code)
+                    ? 'bg-blue-50 border-blue-200 text-blue-600 ring-2 ring-blue-50'
+                    : 'bg-slate-50 border-slate-100 text-slate-400'
+                  }`}
+                >
+                  <div className="flex flex-col text-left">
+                    <span className="text-[10px] font-black uppercase tracking-widest leading-none mb-1">{curr.code}</span>
+                    <span className="text-xs font-bold leading-none">{curr.label}</span>
+                  </div>
+                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-black ${
+                    tripConfig.currencies.includes(curr.code) ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-400'
+                  }`}>
+                    {curr.symbol}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </section>
+        </div>
+      )}
 
       {/* Checklist View */}
       {activePrepTab === 'checklist' && (
@@ -380,7 +488,7 @@ const PrepView: React.FC<PrepViewProps> = ({ members, setMembers }) => {
                   <div className="flex-1 min-w-0">
                     <h3 className="font-bold text-slate-800 truncate">{member.name}</h3>
                     <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">
-                      {member.note || '東京行成員'}
+                      {member.note || '成員'}
                     </p>
                   </div>
                   {isEditingMembers && (

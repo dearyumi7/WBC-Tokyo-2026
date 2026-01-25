@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Plane, Hotel, Ticket as TicketIcon, Utensils, Plus, Edit2, Clock, MapPin, Info, Train, AlertCircle, Trash2, X, Check, ChevronUp, ChevronDown, Package, Armchair, DollarSign, Trophy, Castle, Camera, Music, Gamepad2, ShoppingCart, ExternalLink, Beef, Soup, Pizza, Coffee, Beer, IceCream, Sandwich } from 'lucide-react';
+import React, { useState } from 'https://esm.sh/react@19.2.3';
+import { Plane, Hotel, Ticket as TicketIcon, Utensils, Plus, Edit2, Clock, MapPin, Info, Train, AlertCircle, Trash2, X, Check, ChevronUp, ChevronDown, Package, Armchair, DollarSign, Trophy, Castle, Camera, Music, Gamepad2, ShoppingCart, ExternalLink, Beef, Soup, Pizza, Coffee, Beer, IceCream, Sandwich } from 'https://esm.sh/lucide-react@0.563.0';
 import { Flight, Transport, Accommodation, Ticket, Restaurant, Member } from '../types';
 
 interface BookingViewProps {
@@ -14,6 +14,7 @@ interface BookingViewProps {
   restaurants: Restaurant[];
   setRestaurants: React.Dispatch<React.SetStateAction<Restaurant[]>>;
   members: Member[];
+  isEditable: boolean;
 }
 
 type ModalType = 'flight' | 'transport' | 'hotel' | 'ticket' | 'restaurant' | null;
@@ -46,7 +47,8 @@ const BookingView: React.FC<BookingViewProps> = ({
   hotels, setHotels, 
   tickets, setTickets, 
   restaurants, setRestaurants,
-  members
+  members,
+  isEditable
 }) => {
   const [modalType, setModalType] = useState<ModalType>(null);
   const [formData, setFormData] = useState<any>({});
@@ -253,9 +255,11 @@ const BookingView: React.FC<BookingViewProps> = ({
               <div className="p-2 bg-blue-50 rounded-xl"><Plane size={20} className="text-blue-600" /></div>
               航班資訊
             </h2>
-            <button onClick={() => toggleEditMode('flight')} className={`text-xs font-bold px-3 py-1.5 rounded-full transition-colors ${editModes.flight ? 'bg-slate-900 text-white' : 'text-slate-500 bg-slate-100'}`}>
-              {editModes.flight ? '完成' : '編輯'}
-            </button>
+            {isEditable && (
+              <button onClick={() => toggleEditMode('flight')} className={`text-xs font-bold px-3 py-1.5 rounded-full transition-colors ${editModes.flight ? 'bg-slate-900 text-white' : 'text-slate-500 bg-slate-100'}`}>
+                {editModes.flight ? '完成' : '編輯'}
+              </button>
+            )}
           </div>
           <div className="space-y-4">
             {flights.map((f, i) => (
@@ -326,9 +330,11 @@ const BookingView: React.FC<BookingViewProps> = ({
               <div className="p-2 bg-blue-50 rounded-xl"><Train size={20} className="text-blue-600" /></div>
               交通車票
             </h2>
-            <button onClick={() => toggleEditMode('transport')} className={`text-xs font-bold px-3 py-1.5 rounded-full transition-colors ${editModes.transport ? 'bg-slate-900 text-white' : 'text-slate-500 bg-slate-100'}`}>
-              {editModes.transport ? '完成' : '編輯'}
-            </button>
+            {isEditable && (
+              <button onClick={() => toggleEditMode('transport')} className={`text-xs font-bold px-3 py-1.5 rounded-full transition-colors ${editModes.transport ? 'bg-slate-900 text-white' : 'text-slate-500 bg-slate-100'}`}>
+                {editModes.transport ? '完成' : '編輯'}
+              </button>
+            )}
           </div>
           <div className="space-y-4">
             {transports.map((t, i) => (
@@ -411,9 +417,11 @@ const BookingView: React.FC<BookingViewProps> = ({
               <div className="p-2 bg-blue-50 rounded-xl"><Hotel size={20} className="text-blue-600" /></div>
               住宿資訊
             </h2>
-            <button onClick={() => toggleEditMode('hotel')} className={`text-xs font-bold px-3 py-1.5 rounded-full transition-colors ${editModes.hotel ? 'bg-slate-900 text-white' : 'text-slate-500 bg-slate-100'}`}>
-              {editModes.hotel ? '完成' : '編輯'}
-            </button>
+            {isEditable && (
+              <button onClick={() => toggleEditMode('hotel')} className={`text-xs font-bold px-3 py-1.5 rounded-full transition-colors ${editModes.hotel ? 'bg-slate-900 text-white' : 'text-slate-500 bg-slate-100'}`}>
+                {editModes.hotel ? '完成' : '編輯'}
+              </button>
+            )}
           </div>
           <div className="space-y-4">
             {hotels.map((h, i) => (
@@ -463,9 +471,11 @@ const BookingView: React.FC<BookingViewProps> = ({
               <div className="p-2 bg-blue-50 rounded-xl"><TicketIcon size={20} className="text-blue-600" /></div>
               各式票券
             </h2>
-            <button onClick={() => toggleEditMode('ticket')} className={`text-xs font-bold px-3 py-1.5 rounded-full transition-colors ${editModes.ticket ? 'bg-slate-900 text-white' : 'text-slate-500 bg-slate-100'}`}>
-              {editModes.ticket ? '完成' : '編輯'}
-            </button>
+            {isEditable && (
+              <button onClick={() => toggleEditMode('ticket')} className={`text-xs font-bold px-3 py-1.5 rounded-full transition-colors ${editModes.ticket ? 'bg-slate-900 text-white' : 'text-slate-500 bg-slate-100'}`}>
+                {editModes.ticket ? '完成' : '編輯'}
+              </button>
+            )}
           </div>
           {(Object.entries(groupedTickets) as [string, Ticket[]][]).map(([category, categoryTickets]) => (
             <div key={category} className="space-y-3">
@@ -567,9 +577,11 @@ const BookingView: React.FC<BookingViewProps> = ({
               <div className="p-2 bg-blue-50 rounded-xl"><Utensils size={20} className="text-blue-600" /></div>
               餐廳預約
             </h2>
-            <button onClick={() => toggleEditMode('restaurant')} className={`text-xs font-bold px-3 py-1.5 rounded-full transition-colors ${editModes.restaurant ? 'bg-slate-900 text-white' : 'text-slate-500 bg-slate-100'}`}>
-              {editModes.restaurant ? '完成' : '編輯'}
-            </button>
+            {isEditable && (
+              <button onClick={() => toggleEditMode('restaurant')} className={`text-xs font-bold px-3 py-1.5 rounded-full transition-colors ${editModes.restaurant ? 'bg-slate-900 text-white' : 'text-slate-500 bg-slate-100'}`}>
+                {editModes.restaurant ? '完成' : '編輯'}
+              </button>
+            )}
           </div>
           <div className="space-y-4">
             {restaurants.map((r, i) => (
@@ -738,11 +750,11 @@ const BookingView: React.FC<BookingViewProps> = ({
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">出發時間</label>
-                        <input type="time" value={formData.departureTime} onChange={e => setFormData({...formData, departureTime: e.target.value})} className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-blue-500" />
+                        <input type="time" value={formData.departureTime} onChange={e => setFormData({...formData, departureTime: e.target.value})} className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-blue-600" />
                       </div>
                       <div className="space-y-1">
                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">抵達時間</label>
-                        <input type="time" value={formData.arrivalTime} onChange={e => setFormData({...formData, arrivalTime: e.target.value})} className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-blue-500" />
+                        <input type="time" value={formData.arrivalTime} onChange={e => setFormData({...formData, arrivalTime: e.target.value})} className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-blue-600" />
                       </div>
                     </div>
 

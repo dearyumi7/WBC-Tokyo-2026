@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { MapPin, Navigation, Plus, Sun, Cloud, Clock, Wind, Edit3, Check, X, Info, Trash2, Train, Bus, Car, Plane, Footprints, ChevronRight, ArrowRight, ChevronDown, ChevronUp, StickyNote, DollarSign, GripVertical, History, Utensils, ShoppingBag, Map as MapIcon, Loader2, ArrowLeft, BookOpen, Settings, ListPlus, Bold, Italic, Type, Palette, Minus, ExternalLink, Link, SubcornerRight, Image, Search } from 'lucide-react';
-import { Transport, TransportTransfer } from '../types';
+import React, { useState, useEffect, useRef, useMemo } from 'https://esm.sh/react@19.2.3';
+import { MapPin, Navigation, Plus, Sun, Cloud, Clock, Wind, Edit3, Check, X, Info, Trash2, Train, Bus, Car, Plane, Footprints, ChevronRight, ArrowRight, ChevronDown, ChevronUp, StickyNote, DollarSign, GripVertical, History, Utensils, ShoppingBag, Map as MapIcon, Loader2, ArrowLeft, BookOpen, Settings, ListPlus, Bold, Italic, Type, Palette, Minus, ExternalLink, Link, Image, Search } from 'https://esm.sh/lucide-react@0.563.0';
+import { Transport, TransportTransfer } from '../types.ts';
 
 interface CustomDetail {
   id: string; // 新增唯一 ID 確保排序時組件能正確對應
@@ -17,7 +17,7 @@ interface ScheduleItem {
   plannedTransport?: Partial<Transport>;
   customNote?: string;
   price?: number;
-  currency?: 'JPY' | 'TWD';
+  currency?: 'JPY' | 'TWD' | string;
   customDetails?: CustomDetail[];
 }
 
@@ -202,9 +202,11 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ initialValue, onChange 
 
 interface ItineraryViewProps {
   transports?: Transport[];
+  startDate: string;
+  endDate: string;
 }
 
-const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [] }) => {
+const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDate, endDate }) => {
   const [selectedDay, setSelectedDay] = useState(0);
   const [isEditMode, setIsEditMode] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -220,6 +222,33 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [] }) => {
   const [editingItem, setEditingItem] = useState<ScheduleItem | null>(null);
   const [activeTransportItem, setActiveTransportItem] = useState<ScheduleItem | null>(null);
   const [activeNoteItem, setActiveNoteItem] = useState<ScheduleItem | null>(null);
+
+  // 計算行程日期標籤
+  const days = useMemo(() => {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const result = [];
+    const weekdays = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+    
+    // Safety check for invalid dates
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) return [{ date: '3/5', weekday: 'THU', weather: '12°C', icon: Sun, condition: '晴朗' }];
+
+    let current = new Date(start);
+    // Limit to prevent accidental infinite loop if dates are weird
+    let count = 0;
+    while (current <= end && count < 31) {
+      result.push({
+        date: `${current.getMonth() + 1}/${current.getDate()}`,
+        weekday: weekdays[current.getDay()],
+        weather: '12°C', // Placeholder
+        icon: Sun,      // Placeholder
+        condition: '晴朗' // Placeholder
+      });
+      current.setDate(current.getDate() + 1);
+      count++;
+    }
+    return result;
+  }, [startDate, endDate]);
 
   const [scheduleItems, setScheduleItems] = useState<ScheduleItem[]>([
     { 
@@ -237,151 +266,9 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [] }) => {
         arrivalTime: '05:35',
         note: ''
       }
-    },
-    {
-      id: 'airport-arrival-ngo',
-      time: '11:05',
-      event: '抵達中部國際機場第一航廈',
-      addr: 'Chubu Centrair International Airport T1',
-      type: 'transport',
-      plannedTransport: {
-        type: '飛機',
-        name: '中華航空CI 0154',
-        from: '桃園國際機場',
-        to: '中部國際機場',
-        departureTime: '07:35',
-        arrivalTime: '11:05',
-        note: '',
-        price: 13328,
-        currency: 'TWD'
-      },
-      customNote: '第一航廈4樓購買「蝦仙貝之里」\n推薦綜合口味蝦餅'
-    },
-    {
-      id: 'hotel-luggage-drop',
-      time: '13:30',
-      event: '飯店寄放行李',
-      addr: '1 Chome-14-16 Meiekiminami, Nakamura Ward, Nagoya, Aichi',
-      type: 'visit',
-      plannedTransport: {
-        type: '地鐵',
-        name: '名鐵電車',
-        from: '中部國際機場',
-        to: '名古屋車站',
-        departureTime: '',
-        arrivalTime: '13:30',
-        note: '',
-        price: 1430,
-        currency: 'JPY'
-      }
-    },
-    { 
-      id: 'inuyama-castle', 
-      time: '15:00', 
-      event: '犬山城', 
-      addr: 'Inuyama, Aichi', 
-      type: 'visit',
-      plannedTransport: {
-        type: '地鐵',
-        name: '名鐵特急',
-        from: '名鐵名古屋',
-        to: '犬山遊園',
-        departureTime: '14:13',
-        arrivalTime: '15:10',
-        note: '',
-        price: 690,
-        currency: 'JPY'
-      },
-      customDetails: [
-        { 
-          id: 'inuyama-history', 
-          title: '犬山城歷史介紹', 
-          content: '<div>犬山城由織田信長的叔父織田信康於1537年所建，是日本現存12座天守閣中最古老的，也是被日本指定為國寶的五座名城之一 (另外四座為：姫路城、松本城、彦根城、松江城)。</div><br><div>犬山城又被稱作「白帝城」，源自於李白的《早發白帝城》，因古人覺得犬山城地理環境與詩中「朝辭白帝彩雲間，千里江陵一日還。兩岸猿聲啼不盡，輕舟已過萬重山。」描述極為相似，故有此名。</div>' 
-        },
-        { 
-          id: 'inuyama-nearby', 
-          title: '附近景點', 
-          content: '<div>一、三光稻荷神社洗錢、換福種錢、求戀愛運</div><br><div>位於犬山城山腳的三光稻荷神社，相傳已有400多年歷史，被視為犬山城的守護神社，對守護家庭安全、生意興隆、交通安全、婚姻和睦等都相當靈驗。</div><br><div>境內還有姬龜神社、錢洗稻荷神社、猿田彥神社三座小神社。</div><br><div>祈求良緣的「姬龜神社」最受年輕女性歡迎，粉紅色的心型繪馬和愛心籤詩佈滿整座神社，超美超夢幻。</div><br><div>「錢洗稻荷神社」，據說用這裡的御神水洗錢，就會獲得加倍的報酬。</div><div>洗錢流程如下：</div><div>在接待處付100日圓領取竹簍和一支蠟燭。</div><div>點蠟燭並供奉於燭台之中。</div><div>將錢放在竹簍中用御神水清洗。</div><br><a href="https://www.google.com/maps/search/?api=1&query=%E6%84%9B%E7%9F%A5%E7%B8%A3%E7%8A%AC%E5%B1%B1%E5%B8%82%E7%8A%AC%E5%B1%B1%E5%8C%97%E5%8F%A4%E5%88%B865-18" target="_blank" style="color: #2563eb; font-weight: 700; text-decoration: underline; display: inline-flex; align-items: center; gap: 4px;">📍 愛知縣犬山市犬山北古券65-18</a>&nbsp;<br><div>．營業時間：08:30-16:30 (周一至周日)</div>' 
-        },
-        { 
-          id: 'inuyama-food', 
-          title: '犬山城美食', 
-          content: '<div>1. 犬山牛太郎</div><div>A5飛驒牛握壽司，壽司兩貫一組，有芥末、蒜、薑三種口味任選。</div><br><div>肉質呈現淡粉色，油花細緻豐富，肉片微微炙燒過，入口即化香氣十足，沾醬山葵辣度不高，適度提味剛剛好。</div><br><a href="https://www.google.com/maps/search/?api=1&query=%E6%84%9B%E7%9F%A5%E7%B8%A3%E7%8A%AC%E5%B1%B1%E5%B8%82%E7%8A%AC%E5%B1%B1%E6%9D%B1%E5%8F%A4%E5%88%B875" target="_blank" style="color: #2563eb; font-weight: 700; text-decoration: underline; display: inline-flex; align-items: center; gap: 4px;">📍 愛知縣犬山市犬山東古券75</a>&nbsp;<br><div>．營業時間：09:00-17:00 (周一至周日)</div><hr style="margin: 12px 0;"><div>2. 本町茶寮</div><div>童趣滿點可愛超療癒！金魚果凍蘇打，內用直接放在魚缸裡，外帶則是夾鏈袋，話題性滿點。</div><br><div>飲料中藍色是蒟蒻，料放滿滿每口都喝的到，金魚本體則沒什麼特殊味道，沁涼消暑親子出遊犬山城記得來品嘗。</div><br><a href="https://www.google.com/maps/search/?api=1&query=%E6%84%9B%E7%9F%A5%E7%B8%A3%E7%8A%AC%E5%B1%B1%E5%B8%82%E7%8A%AC%E5%B1%B1%E6%9D%B1%E5%8F%A4%E5%88%B8673" target="_blank" style="color: #2563eb; font-weight: 700; text-decoration: underline; display: inline-flex; align-items: center; gap: 4px;">📍 愛知縣犬山市犬山東古券673</a>&nbsp;<br><div>．營業時間：11:00-17:00 (周一至周日)</div><hr style="margin: 12px 0;"><div>3. Tonamaru串炸</div><div>五彩繽紛的串炸，光看就讓人著迷，有雞肉、豬肉、鮮蝦三種口味可選。</div><div>豬肉，顆粒炸粉酥脆帶點硬，裡面的肉鮮美不老柴。</div><br><a href="https://www.google.com/maps/search/?api=1&query=%E6%84%9B%E7%9F%A5%E7%B8%A3%E7%8A%AC%E5%B1%B1%E5%B8%82%E7%8A%AC%E5%B1%B1%E8%A5%BF%E5%8F%A4%E5%88%B812-1" target="_blank" style="color: #2563eb; font-weight: 700; text-decoration: underline; display: inline-flex; align-items: center; gap: 4px;">📍 愛知縣犬山市犬山西古券12-1</a>&nbsp;<br><div>．營業時間：10:30-17:00 (周一至周日)</div><hr style="margin: 12px 0;"><div>4. 戀小町團子</div><div>宛如珠寶般色彩繽紛，廣受女孩歡迎，位於充滿懷舊感的犬山城下町昭和橫丁內，非常適合拍照打卡的散步美食。</div><br><div>糰子充滿嚼勁，搭配10種以上水果和食材製成的豆沙餡，有草莓、蜜柑、抹茶等依季節做變化，甜度恰到好處。</div><br><a href="https://www.google.com/maps/search/?api=1&query=%E6%84%9B%E7%9F%A5%E7%B8%A3%E7%8A%AC%E5%B1%B1%E5%B8%82%E7%8A%AC%E5%B1%B1%E8%A5%BF%E5%8F%A4%E5%88%B860%20%E6%98%AD%E5%92%8C%E6%A9%AB%E4%B8%81%E5%85%A7" target="_blank" style="color: #2563eb; font-weight: 700; text-decoration: underline; display: inline-flex; align-items: center; gap: 4px;">📍 愛知縣犬山市犬山西古券60 昭和橫丁內</a>&nbsp;<br><div>．營業時間：11:00-17:00 (周二公休)</div>' 
-        }
-      ]
-    },
-    {
-      id: 'sakae-district',
-      time: '19:00',
-      event: '榮商圈',
-      addr: 'Sakae, Naka Ward, Nagoya, Aichi',
-      type: 'visit',
-      currency: 'JPY',
-      plannedTransport: {
-        type: '地鐵',
-        name: '名鐵特急',
-        from: '犬山遊園',
-        to: '名鐵名古屋',
-        departureTime: '18:00',
-        arrivalTime: '18:35',
-        currency: 'JPY',
-        transfers: [
-          {
-            type: '地鐵',
-            name: '東山線',
-            from: '名古屋車站',
-            to: '榮(愛知)',
-            departureTime: '18:37',
-            arrivalTime: '18:41'
-          }
-        ]
-      },
-      customDetails: [
-        { 
-          id: 'sakae-matsuzakaya', 
-          title: '松阪屋', 
-          content: '<div>一、美食</div><div>1. 「矢場とん」味噌豬排: 南館10樓</div><div>2. HARBS: 本館4樓</div><hr style="margin: 12px 0;"><div>二、伴手禮</div><div>1. 治一郎年輪蛋糕: 江湖人稱「喝的年輪蛋糕」，因為它的濕潤度高到不需要配飲料。蛋糕體層層分明，口感紮實卻又入口即化，蛋香和奶油香氣非常高雅。</div><hr style="margin: 12px 0;"><div>．營業時間: B2～3樓的賣場開到晚上8點，但4樓以上的樓層只開到晚上7點半(部分餐廳除外)</div><div>．退稅櫃台: 南館3樓</div>' 
-        },
-        { 
-          id: 'sakae-mitsukoshi', 
-          title: '名古屋榮三越/LACHIC', 
-          content: '<div>一、美食</div><div>1. 「矢場とん」味噌豬排: 7F</div><div>2. HARBS: 2F</div><hr style="margin: 12px 0;"><div>二、購物</div><div>2F: BEAMS、UNITED ARROWS這些指標性的選物店都在此</div><div>4F: BEAMS旗下的B:MING LIFE STORE就在這，風格比較清新、實穿</div><div>5F: The North Face、MAMMUT長毛象，或是日本超夯的and wander</div><hr style="margin: 12px 0;"><div>．營業時間: 11:00 – 21:00</div>' 
-        },
-        { 
-          id: 'sakae-parco', 
-          title: 'PARCO', 
-          content: '<div>一、娛樂</div><div>1. 寶可夢中心: 東館2F</div><div>2. 吉伊卡哇樂園: 東館3F</div><div>3. C-pla (扭蛋專門店): 東館4F</div><hr style="margin: 12px 0;"><div>．營業時間: 10:00 – 20:00</div>' 
-        }
-      ]
-    },
-    {
-      id: 'nagoya-station-return',
-      time: '21:00',
-      event: '名古屋車站',
-      addr: 'Nakamura Ward, Nagoya, Aichi',
-      type: 'visit',
-      plannedTransport: {
-        type: '地鐵',
-        name: '東山線',
-        from: '榮(愛知)',
-        to: '名古屋車站',
-        departureTime: '20:45',
-        arrivalTime: '20:52',
-        price: 210,
-        currency: 'JPY'
-      },
-      customNote: '千里馬藥局\n營業時間09:00–21:00(1樓到22:00)\n退稅櫃檯在2樓'
-    },
-    {
-      id: 'hotel-rest',
-      time: '22:30',
-      event: '飯店休息',
-      addr: '1 Chome-14-16 Meiekiminami, Nakamura Ward, Nagoya, Aichi',
-      type: 'visit'
     }
   ]);
 
-  // 新增 activeItemId 用於追蹤當前滾動到的項目
   const [activeItemId, setActiveItemId] = useState<string | null>(scheduleItems[0]?.id || null);
   const visibilityMap = useRef<Map<string, number>>(new Map());
   
@@ -403,11 +290,10 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [] }) => {
     }
   });
 
-  // 設定滾動監測：根據佔比最多且最完整的行程來切換藍色圈圈
+  // 設定滾動監測
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
-        // 更新當前畫面上所有觀察對象的可視佔比
         entries.forEach((entry) => {
           const id = entry.target.getAttribute('data-id');
           if (id) {
@@ -415,12 +301,10 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [] }) => {
           }
         });
 
-        // 找出佔比最大（最完整）的項目
         let maxRatio = -1;
         let bestId = null;
         let bestTop = Infinity;
 
-        // 從 DOM 中取得所有行程行，確保按順序（從上到下）進行比對
         const allRows = document.querySelectorAll('.itinerary-item-row');
         allRows.forEach((el) => {
           const id = el.getAttribute('data-id');
@@ -429,9 +313,6 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [] }) => {
           const ratio = visibilityMap.current.get(id) || 0;
           const rect = el.getBoundingClientRect();
 
-          // 判斷邏輯：
-          // 1. 如果此項目的佔比比目前最好的更高，則它勝出。
-          // 2. 如果佔比一樣（例如都是 1.0 完整顯示），則選取 bounding box 頂部更靠近視窗頂部的（Topmost）。
           if (ratio > maxRatio) {
             maxRatio = ratio;
             bestId = id;
@@ -449,7 +330,6 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [] }) => {
         }
       },
       {
-        // 使用多個門檻值（thresholds）以獲得更平滑的佔比計算
         threshold: [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
         rootMargin: '0px'
       }
@@ -504,17 +384,7 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [] }) => {
 
   const [noteFormData, setNoteFormData] = useState<string>('');
 
-  const days = [
-    { date: '3/5', weekday: 'THU', weather: '12°C', icon: Sun, condition: '晴朗' },
-    { date: '3/6', weekday: 'FRI', weather: '10°C', icon: Cloud, condition: '多雲' },
-    { date: '3/7', weekday: 'SAT', weather: '11°C', icon: Sun, condition: '晴朗' },
-    { date: '3/8', weekday: 'SUN', weather: '9°C', icon: Cloud, condition: '陰天' },
-    { date: '3/9', weekday: 'MON', weather: '13°C', icon: Sun, condition: '晴朗' },
-    { date: '3/10', weekday: 'TUE', weather: '12°C', icon: Sun, condition: '晴朗' },
-    { date: '3/11', weekday: 'WED', weather: '11°C', icon: Cloud, condition: '多雲' },
-  ];
-
-  const currentDayWeather = days[selectedDay];
+  const currentDayWeather = days[selectedDay] || days[0];
 
   const isTransportExpanded = (id: string, item: ScheduleItem) => {
     if (expandedTransports[id] !== undefined) return expandedTransports[id];
@@ -713,7 +583,6 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [] }) => {
   };
 
   const handleDetailDragStart = (e: React.DragEvent, id: string) => {
-    // 檢查目標是否為輸入框或編輯器，若是則不觸發拖曳，保留選取文字功能
     const target = e.target as HTMLElement;
     if (target.tagName === 'INPUT' || target.closest('[contenteditable="true"]')) {
       return;
@@ -767,14 +636,11 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [] }) => {
     }));
   };
 
-  // 過濾已被其他行程引用的交通預訂
   const availableTransports = transports.filter(t => {
-    // 檢查此交通預訂是否已被任何行程引用 (排除目前正在編輯的行程所引用的那個)
     return !scheduleItems.some(item => {
       if (item.id === activeTransportItem?.id) return false;
       const pt = item.plannedTransport;
       if (!pt) return false;
-      // 使用多個欄位比對以確定是同一個預訂
       return pt.type === t.type && pt.name === t.name && pt.from === t.from && pt.to === t.to && pt.departureTime === t.departureTime && pt.arrivalTime === t.arrivalTime;
     });
   });
@@ -808,7 +674,7 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [] }) => {
               <span className="text-2xl font-black text-slate-800">{currentDayWeather.weather}</span>
               <span className="text-sm font-bold text-slate-500">{currentDayWeather.condition}</span>
             </div>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">東京地區天氣預報</p>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">旅遊地區天氣預報</p>
           </div>
         </div>
         <div className="flex flex-col items-end text-right">
@@ -963,7 +829,6 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [] }) => {
                       {React.createElement(getTransportIcon(item.plannedTransport?.type), { size: 64 })}
                     </div>
                     
-                    {/* Main Leg */}
                     <div className="flex items-center gap-4">
                       <div className="w-10 h-10 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 shrink-0">
                         {React.createElement(getTransportIcon(item.plannedTransport?.type), { size: 20 })}
@@ -998,7 +863,6 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [] }) => {
                       </div>
                     </div>
 
-                    {/* Transfers */}
                     {item.plannedTransport?.transfers && item.plannedTransport.transfers.length > 0 && (
                       <div className="space-y-4 pt-2 border-t border-blue-50">
                         {item.plannedTransport.transfers.map((transfer, tIdx) => (
@@ -1173,7 +1037,7 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [] }) => {
                     <div className="space-y-8">
                       {formData.customDetails?.map((detail, idx) => (
                         <div 
-                          key={detail.id} // 使用唯一 ID 作為 key，確保 React 能夠追蹤組件身份
+                          key={detail.id} 
                           draggable
                           onDragStart={(e) => handleDetailDragStart(e, detail.id)}
                           onDragOver={handleDragOver}
@@ -1273,7 +1137,6 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [] }) => {
                   </div>
                 )}
 
-                {/* Primary Segment */}
                 <div className="bg-slate-50 p-4 rounded-3xl border border-slate-100 space-y-4">
                   <div className="flex items-center gap-3 mb-2">
                     <div className="w-10 h-10 bg-white rounded-2xl border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
@@ -1321,7 +1184,6 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [] }) => {
                   </div>
                 </div>
 
-                {/* Transfers Segments */}
                 {transportFormData.transfers && transportFormData.transfers.length > 0 && (
                   <div className="space-y-6">
                     <label className="text-[10px] font-black text-blue-500 uppercase tracking-widest ml-1 block">轉乘資訊</label>
@@ -1333,7 +1195,6 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [] }) => {
                         >
                           <X size={12} />
                         </button>
-                        
                         <div className="flex items-center gap-3 mb-2">
                           <div className="w-10 h-10 bg-white rounded-2xl border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
                             {React.createElement(getTransportIcon(transfer.type), { size: 20 })}
@@ -1399,7 +1260,7 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [] }) => {
                       </button>
                       <button 
                         onClick={() => setTransportFormData({...transportFormData, currency: 'TWD'})}
-                        className={`px-3 py-1 text-[10px] font-black rounded-xl transition-all ${formData.currency === 'TWD' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400'}`}
+                        className={`px-3 py-1 text-[10px] font-black rounded-xl transition-all ${transportFormData.currency === 'TWD' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400'}`}
                       >
                         TWD
                       </button>

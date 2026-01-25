@@ -1,5 +1,5 @@
-import React, { useState, useRef, useMemo } from 'react';
-import { ShoppingBag, Plus, Trash2, Edit3, MapPin, X, Check, Camera, Image as ImageIcon, CreditCard, AlertCircle, AlertTriangle, Coins, PieChart, Target, User, Info, GripVertical, Lock, LockOpen } from 'lucide-react';
+import React, { useState, useRef, useMemo } from 'https://esm.sh/react@19.2.3';
+import { ShoppingBag, Plus, Trash2, Edit3, MapPin, X, Check, Camera, Image as ImageIcon, CreditCard, AlertCircle, AlertTriangle, Coins, PieChart, Target, User, Info, GripVertical, Lock, LockOpen } from 'https://esm.sh/lucide-react@0.563.0';
 import { EXCHANGE_RATE } from '../constants';
 import { ShoppingItem, Member } from '../types';
 
@@ -7,6 +7,8 @@ interface ShoppingViewProps {
   items: ShoppingItem[];
   setItems: React.Dispatch<React.SetStateAction<ShoppingItem[]>>;
   members: Member[];
+  isEditable: boolean;
+  activeCurrencies: string[];
 }
 
 const CATEGORIES = [
@@ -16,7 +18,7 @@ const CATEGORIES = [
   { id: '其他', label: '其他', color: 'bg-slate-100 text-slate-600' },
 ];
 
-const ShoppingView: React.FC<ShoppingViewProps> = ({ items, setItems, members }) => {
+const ShoppingView: React.FC<ShoppingViewProps> = ({ items, setItems, members, isEditable, activeCurrencies }) => {
   const [activeSubTab, setActiveSubTab] = useState<'list' | 'stats'>('list');
   const [activeMemberId, setActiveMemberId] = useState<string | null>(members[0]?.id || null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -43,7 +45,7 @@ const ShoppingView: React.FC<ShoppingViewProps> = ({ items, setItems, members })
     twdPrice: 0,
     actualJpy: 0,
     actualTwd: 0,
-    actualCurrency: undefined,
+    actualCurrency: activeCurrencies[0],
     image: '',
     checked: false,
     memberId: members[0]?.id
@@ -156,7 +158,7 @@ const ShoppingView: React.FC<ShoppingViewProps> = ({ items, setItems, members })
       twdPrice: 0,
       actualJpy: 0,
       actualTwd: 0,
-      actualCurrency: undefined,
+      actualCurrency: activeCurrencies[0],
       image: '',
       checked: false,
       memberId: activeMemberId || members[0]?.id
@@ -588,7 +590,6 @@ const ShoppingView: React.FC<ShoppingViewProps> = ({ items, setItems, members })
           )}
         </div>
 
-        {/* Modals styles matching BookingView */}
         {itemToUncheck && (
           <div className="fixed inset-0 z-[110] flex items-center justify-center px-6">
             <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setItemToUncheck(null)}></div>
@@ -692,7 +693,7 @@ const ShoppingView: React.FC<ShoppingViewProps> = ({ items, setItems, members })
                     <div className="bg-blue-50/50 p-5 rounded-[2rem] border-2 border-blue-100/50 space-y-4 shadow-sm">
                       <div className="flex items-center gap-2 mb-1">
                         <CreditCard size={14} className="text-blue-600" />
-                        <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">實付記錄 (手動填寫即凸顯)</span>
+                        <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">實付記錄 (選填啟用同步)</span>
                       </div>
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1">
@@ -736,6 +737,21 @@ const ShoppingView: React.FC<ShoppingViewProps> = ({ items, setItems, members })
                           />
                         </div>
                       </div>
+                      
+                      {activeCurrencies.length > 2 && (
+                        <div className="flex gap-2 overflow-x-auto py-1">
+                           {activeCurrencies.filter(c => c !== 'JPY' && c !== 'TWD').map(c => (
+                             <button
+                               key={c}
+                               type="button"
+                               onClick={() => setFormData(prev => ({ ...prev, actualCurrency: c }))}
+                               className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all ${formData.actualCurrency === c ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-slate-200 text-slate-400'}`}
+                             >
+                               使用 {c}
+                             </button>
+                           ))}
+                        </div>
+                      )}
                     </div>
                   )}
                   <div className="space-y-1">

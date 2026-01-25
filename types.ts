@@ -7,6 +7,13 @@ export interface Member {
   note?: string;
 }
 
+export interface TripConfig {
+  name: string;
+  startDate: string;
+  endDate: string;
+  currencies: string[];
+}
+
 export interface Flight {
   airline: string;
   flightNo: string;
@@ -44,7 +51,7 @@ export interface Transport {
   seatInfo: string;
   note?: string;
   price?: number;
-  currency?: 'JPY' | 'TWD';
+  currency?: 'JPY' | 'TWD' | string;
   memberSeats?: Record<string, { type: string, seat: string }>; // memberId -> { type, seat }
   transfers?: TransportTransfer[];
 }
@@ -97,7 +104,7 @@ export interface ItineraryItem {
 export interface Transaction {
   id: string;
   date: string;
-  currency: 'TWD' | 'JPY';
+  currency: string;
   amount: number;
   twdAmount: number;
   location: string;
@@ -117,7 +124,7 @@ export interface ShoppingItem {
   jpyPrice: number;
   actualJpy?: number;
   actualTwd?: number;
-  actualCurrency?: 'JPY' | 'TWD';
+  actualCurrency?: string;
   image?: string;
   checked: boolean;
   memberId?: string;
