@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MapPin, Navigation, Plus, Sun, Cloud, Clock, Wind, Edit3, Check, X, Info, Trash2, Train, Bus, Car, Plane, Footprints, ChevronRight, ArrowRight, ChevronDown, ChevronUp, StickyNote, DollarSign, GripVertical, History, Utensils, ShoppingBag, Map as MapIcon, Loader2, ArrowLeft, BookOpen, Settings, ListPlus, Bold, Italic, Type, Palette, Minus, ExternalLink, Link, SubcornerRight, Image, Search } from 'lucide-react';
+// Fix: Remove non-existent SubcornerRight icon from lucide-react
+import { MapPin, Navigation, Plus, Sun, Cloud, Clock, Wind, Edit3, Check, X, Info, Trash2, Train, Bus, Car, Plane, Footprints, ChevronRight, ArrowRight, ChevronDown, ChevronUp, StickyNote, DollarSign, GripVertical, History, Utensils, ShoppingBag, Map as MapIcon, Loader2, ArrowLeft, BookOpen, Settings, ListPlus, Bold, Italic, Type, Palette, Minus, ExternalLink, Link, Image, Search } from 'lucide-react';
 import { Transport, TransportTransfer } from '../types';
 
 interface CustomDetail {

@@ -7,9 +7,19 @@ import ItineraryView from './components/ItineraryView';
 import ExpenseView from './components/ExpenseView';
 import ShoppingView from './components/ShoppingView';
 import PrepView from './components/PrepView';
+import { db } from './firebase';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('itinerary'); // Set default to itinerary
+
+  // Verify Firebase Connection
+  useEffect(() => {
+    if (db) {
+      console.log('Firebase 連線成功');
+    } else {
+      console.error('Firebase 連線失敗');
+    }
+  }, []);
 
   // State Management
   const [members, setMembers] = useState<Member[]>([
@@ -99,10 +109,10 @@ const App: React.FC = () => {
   ]);
 
   const [shoppingItems, setShoppingItems] = useState<ShoppingItem[]>([
-    { id: '1', name: 'WBC 紀念球衣', category: '服飾', quantity: 1, note: 'XL號 藍色', jpyPrice: 12000, twdPrice: 3200, checked: false, memberId: '1' },
-    { id: '2', name: '大谷翔平簽名球', category: '週邊', quantity: 1, note: '如果還有貨的話', jpyPrice: 5000, twdPrice: 1500, checked: true, memberId: '1' },
-    { id: '3', name: '合利他命 EX Plus', category: '藥品', quantity: 3, note: '幫家人帶', jpyPrice: 6500, twdPrice: 2200, checked: false, memberId: '2' },
-    { id: '4', name: '一蘭拉麵包', category: '食品', quantity: 2, note: '機場買', jpyPrice: 2000, twdPrice: 550, checked: false, memberId: '2' },
+    { id: '1', name: 'WBC 紀念球衣', category: '服飾', location: '東京巨蛋', quantity: 1, note: 'XL號 藍色', jpyPrice: 12000, twdPrice: 3200, checked: false, memberId: '1' },
+    { id: '2', name: '大谷翔平簽名球', category: '週邊', location: '東京巨蛋', quantity: 1, note: '如果還有貨的話', jpyPrice: 5000, twdPrice: 1500, checked: true, memberId: '1' },
+    { id: '3', name: '合利他命 EX Plus', category: '藥品', location: '松本清', quantity: 3, note: '幫家人帶', jpyPrice: 6500, twdPrice: 2200, checked: false, memberId: '2' },
+    { id: '4', name: '一蘭拉麵包', category: '食品', location: '機場', quantity: 2, note: '機場買', jpyPrice: 2000, twdPrice: 550, checked: false, memberId: '2' },
   ]);
 
   const renderContent = () => {
