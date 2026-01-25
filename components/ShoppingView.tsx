@@ -7,8 +7,6 @@ interface ShoppingViewProps {
   items: ShoppingItem[];
   setItems: React.Dispatch<React.SetStateAction<ShoppingItem[]>>;
   members: Member[];
-  /* Fix: Add isEditable prop */
-  isEditable?: boolean;
 }
 
 const CATEGORIES = [
@@ -18,7 +16,7 @@ const CATEGORIES = [
   { id: '其他', label: '其他', color: 'bg-slate-100 text-slate-600' },
 ];
 
-const ShoppingView: React.FC<ShoppingViewProps> = ({ items, setItems, members, isEditable = false }) => {
+const ShoppingView: React.FC<ShoppingViewProps> = ({ items, setItems, members }) => {
   const [activeSubTab, setActiveSubTab] = useState<'list' | 'stats'>('list');
   const [activeMemberId, setActiveMemberId] = useState<string | null>(members[0]?.id || null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -295,31 +293,28 @@ const ShoppingView: React.FC<ShoppingViewProps> = ({ items, setItems, members, i
                 ))}
               </div>
               
-              {/* Fix: Gate edit controls with isEditable */}
-              {isEditable && (
-                <div className="flex items-center gap-1.5 shrink-0">
-                  {isEditMode && (
-                    <button 
-                      onClick={handleOpenAddModal}
-                      className="p-1.5 bg-blue-600 text-white rounded-lg shadow-lg shadow-blue-100 active:scale-90 transition-all"
-                    >
-                      <Plus size={16} />
-                    </button>
-                  )}
-
+              <div className="flex items-center gap-1.5 shrink-0">
+                {isEditMode && (
                   <button 
-                    onClick={() => setIsEditMode(!isEditMode)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all active:scale-95 border ${
-                      isEditMode 
-                      ? 'bg-slate-900 border-slate-900 text-white' 
-                      : 'bg-white border-slate-200 text-slate-500'
-                    }`}
+                    onClick={handleOpenAddModal}
+                    className="p-1.5 bg-blue-600 text-white rounded-lg shadow-lg shadow-blue-100 active:scale-90 transition-all"
                   >
-                    {isEditMode ? <Check size={14} /> : <Edit3 size={14} />}
-                    <span>{isEditMode ? '完成' : '編輯'}</span>
+                    <Plus size={16} />
                   </button>
-                </div>
-              )}
+                )}
+
+                <button 
+                  onClick={() => setIsEditMode(!isEditMode)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all active:scale-95 border ${
+                    isEditMode 
+                    ? 'bg-slate-900 border-slate-900 text-white' 
+                    : 'bg-white border-slate-200 text-slate-500'
+                  }`}
+                >
+                  {isEditMode ? <Check size={14} /> : <Edit3 size={14} />}
+                  <span>{isEditMode ? '完成' : '編輯'}</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>

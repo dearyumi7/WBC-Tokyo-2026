@@ -1,161 +1,184 @@
-import React, { useState, useEffect } from 'https://esm.sh/react@19.2.3';
-import { Plane, Calendar, Wallet, ShoppingBag, ClipboardList, LogIn, LogOut, ShieldCheck } from 'https://esm.sh/lucide-react@0.563.0';
-import { TabType, Member, ShoppingItem } from './types.ts';
-import { DEFAULT_FLIGHTS } from './constants.tsx';
-import BookingView from './components/BookingView.tsx';
-import ItineraryView from './components/ItineraryView.tsx';
-import ExpenseView from './components/ExpenseView.tsx';
-import ShoppingView from './components/ShoppingView.tsx';
-import PrepView from './components/PrepView.tsx';
-import { db, auth, googleProvider, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut } from './firebase.ts';
-import { collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
-
-const ADMIN_EMAIL = "dearyumi7@gmail.com";
+import React, { useState, useEffect } from 'react';
+import { Plane, Hotel, Ticket as TicketIcon, Utensils, Calendar, Wallet, ShoppingBag, ClipboardList, Users } from 'lucide-react';
+import { TabType, Flight, Transport, Accommodation, Ticket, Restaurant, Member, ShoppingItem } from './types';
+import { COLORS, DEFAULT_FLIGHTS, EXCHANGE_RATE } from './constants';
+import BookingView from './components/BookingView';
+import ItineraryView from './components/ItineraryView';
+import ExpenseView from './components/ExpenseView';
+import ShoppingView from './components/ShoppingView';
+import PrepView from './components/PrepView';
+import { db } from './firebase';
 
 const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<TabType>('itinerary');
-  const [user, setUser] = useState<any>(null);
-  const [isEditable, setIsEditable] = useState(false);
-  const [isAuthLoading, setIsAuthLoading] = useState(true);
-  
-  const [members, setMembers] = useState<Member[]>([]);
-  const [itineraryItems, setItineraryItems] = useState<any[]>([]);
-  const [shoppingItems, setShoppingItems] = useState<ShoppingItem[]>([]);
+  const [activeTab, setActiveTab] = useState<TabType>('itinerary'); // Set default to itinerary
 
-  // 1. 核心 Auth 與 跳轉結果處理
+  // Verify Firebase Connection
   useEffect(() => {
-    if (!auth) return;
-
-    // 處理跳轉後的回傳結果
-    const checkRedirect = async () => {
-      try {
-        const result = await getRedirectResult(auth);
-        if (result?.user) {
-          console.log('Redirect Login Success:', result.user.email);
-        }
-      } catch (error: any) {
-        if (error.code === 'auth/configuration-not-found') {
-          console.error("CRITICAL: Firebase Google 登入尚未啟用。請至 Firebase Console -> Authentication -> Sign-in method 啟用 Google 提供者。");
-        } else if (error.code !== 'auth/no-recent-redirect-anyway') {
-          console.error("Auth Error:", error.code, error.message);
-        }
-      }
-    };
-
-    checkRedirect();
-
-    // 監聽登入狀態
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      setIsAuthLoading(false);
-    });
-
-    return () => unsubscribe();
+    if (db) {
+      console.log('Firebase 連線成功');
+    } else {
+      console.error('Firebase 連線失敗');
+    }
   }, []);
 
-  // 2. 雲端同步
-  useEffect(() => {
-    if (!db) return;
+  // State Management
+  const [members, setMembers] = useState<Member[]>([
+    { id: '1', name: 'Yumi', color: 'bg-blue-500' },
+    { id: '2', name: 'Ping', color: 'bg-pink-500' }
+  ]);
 
-    const handleSyncError = (error: any) => {
-      if (error.code === 'permission-denied') {
-        console.warn("Firestore: Guest Mode (Read-only)");
+  const [flights, setFlights] = useState<Flight[]>(DEFAULT_FLIGHTS);
+  const [transports, setTransports] = useState<Transport[]>([
+    {
+      type: '新幹線',
+      name: 'NOZOMI226',
+      date: '2026/03/06',
+      from: '名古屋',
+      to: '東京',
+      departureTime: '10:06',
+      arrivalTime: '11:45',
+      duration: '1小時39分',
+      seatInfo: '',
+      note: '請將行李置於座位後方',
+      memberSeats: {
+        '1': { type: '指定席', seat: '6車 12-A' },
+        '2': { type: '指定席', seat: '6車 12-B' }
       }
-    };
-
-    const unsubMembers = onSnapshot(collection(db, 'members'), (snap) => {
-      setMembers(snap.docs.map(d => ({ ...d.data(), id: d.id })) as Member[]);
-    }, handleSyncError);
-
-    const unsubItinerary = onSnapshot(collection(db, 'itinerary'), (snap) => {
-      setItineraryItems(snap.docs.map(d => ({ ...d.data(), id: d.id })));
-    }, handleSyncError);
-
-    const unsubShopping = onSnapshot(collection(db, 'shoppingItems'), (snap) => {
-      setShoppingItems(snap.docs.map(d => ({ ...d.data(), id: d.id })) as ShoppingItem[]);
-    }, handleSyncError);
-
-    return () => { unsubMembers(); unsubItinerary(); unsubShopping(); };
-  }, [db]);
-
-  // 3. 管理員身分自動判定
-  useEffect(() => {
-    if (user) {
-      const email = user.email?.toLowerCase().trim();
-      const isAdmin = email === ADMIN_EMAIL.toLowerCase();
-      const isRegisteredMember = members.some(m => m.note?.toLowerCase().trim() === email);
-      setIsEditable(isAdmin || isRegisteredMember);
-    } else {
-      setIsEditable(false);
     }
-  }, [user, members]);
+  ]);
+  const [hotels, setHotels] = useState<Accommodation[]>([
+    {
+      name: 'Comfort Hotel Nagoya Meiekiminami',
+      address: '1 Chome-14-16 Meiekiminami, Nakamura Ward, Nagoya, Aichi 450-0003, Japan',
+      checkIn: '2026/03/05 15:00',
+      checkOut: '2026/03/10 10:00',
+      dates: '2026/03/05 - 2026/03/10',
+      price: 25000,
+      image: 'https://picsum.photos/800/400?random=1'
+    }
+  ]);
+  const [tickets, setTickets] = useState<Ticket[]>([
+    {
+      id: 't1',
+      category: '球賽票券',
+      event: 'WBC Pool C',
+      date: '2026/03/06',
+      time: '19:00',
+      teams: 'Japan vs Chinese Taipei',
+      section: 'A44',
+      row: '14',
+      seat: '389 & 390',
+      notes: '',
+      iconType: 'trophy'
+    },
+    {
+      id: 't2',
+      category: '球賽票券',
+      event: 'WBC Pool C',
+      date: '2026/03/07',
+      time: '12:00',
+      teams: 'Czechia vs Chinese Taipei',
+      section: 'D12',
+      row: '5',
+      seat: '290 & 291',
+      location: 'Tokyo Dome',
+      notes: '',
+      iconType: 'trophy'
+    },
+    {
+      id: 't3',
+      category: '景點票券',
+      event: 'SHIBUYA SKY 展望台',
+      date: '2026/03/06',
+      time: '16:30',
+      location: 'Shibuya Scramble Square',
+      notes: '請提前 15 分鐘抵達 14 樓入口',
+      iconType: 'camera'
+    }
+  ]);
+  const [restaurants, setRestaurants] = useState<Restaurant[]>([
+    { 
+      name: 'Peter Luger Steak House', 
+      date: '2026/03/06', 
+      time: '13:15',
+      address: '日本〒150-0013 Tokyo, Shibuya, Ebisu, 4 Chome−19−19 Peter Luger Steak House Tokyo',
+      reservedDishes: '平日午間套餐*2',
+      note: '不收現金',
+      iconType: 'steak'
+    }
+  ]);
 
-  const handleLogin = async () => {
-    if (!auth || !googleProvider) return;
-    try {
-      await signInWithRedirect(auth, googleProvider);
-    } catch (error: any) {
-      console.error("Login Trigger Error:", error.code);
+  const [shoppingItems, setShoppingItems] = useState<ShoppingItem[]>([
+    { id: '1', name: 'WBC 紀念球衣', category: '服飾', location: '東京巨蛋', quantity: 1, note: 'XL號 藍色', jpyPrice: 12000, twdPrice: 3200, checked: false, memberId: '1' },
+    { id: '2', name: '大谷翔平簽名球', category: '週邊', location: '東京巨蛋', quantity: 1, note: '如果還有貨的話', jpyPrice: 5000, twdPrice: 1500, checked: true, memberId: '1' },
+    { id: '3', name: '合利他命 EX Plus', category: '藥品', location: '松本清', quantity: 3, note: '幫家人帶', jpyPrice: 6500, twdPrice: 2200, checked: false, memberId: '2' },
+    { id: '4', name: '一蘭拉麵包', category: '食品', location: '機場', quantity: 2, note: '機場買', jpyPrice: 2000, twdPrice: 550, checked: false, memberId: '2' },
+  ]);
+
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'booking':
+        return <BookingView 
+          flights={flights} setFlights={setFlights}
+          transports={transports} setTransports={setTransports}
+          hotels={hotels} setHotels={setHotels}
+          tickets={tickets} setTickets={setTickets}
+          restaurants={restaurants} setRestaurants={setRestaurants}
+          members={members}
+        />;
+      case 'itinerary':
+        return <ItineraryView transports={transports} />;
+      case 'expenses':
+        return <ExpenseView members={members} />;
+      case 'shopping':
+        return <ShoppingView items={shoppingItems} setItems={setShoppingItems} members={members} />;
+      case 'prep':
+        return <PrepView members={members} setMembers={setMembers} />;
+      default:
+        return <ItineraryView transports={transports} />;
     }
   };
 
-  const handleLogout = () => signOut(auth).catch(console.error);
+  const navItems = [
+    { id: 'itinerary', icon: Calendar, label: '行程' },
+    { id: 'booking', icon: Plane, label: '預訂' },
+    { id: 'expenses', icon: Wallet, label: '記帳' },
+    { id: 'shopping', icon: ShoppingBag, label: '購物' },
+    { id: 'prep', icon: ClipboardList, label: '準備' },
+  ];
 
   return (
-    <div className="flex flex-col h-screen bg-slate-100 text-slate-900 overflow-hidden">
-      <header className="px-6 pt-12 pb-4 bg-white shadow-sm flex justify-between items-center shrink-0 z-30">
-        <div className="flex flex-col">
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-black tracking-tighter">WBC Tokyo</h1>
-            <div className={`status-dot ${user ? 'status-online' : 'status-offline'}`}></div>
-            {isEditable && (
-              <div className="bg-emerald-600 text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase animate-fade-in shadow-sm flex items-center gap-1">
-                <ShieldCheck size={10} /> 管理員模式：已連線
-              </div>
-            )}
-          </div>
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-            {user ? user.email : 'Guest Mode'}
-          </span>
+    <div className="flex flex-col h-screen bg-slate-100 text-slate-900">
+      <header className="px-6 pt-12 pb-1 bg-white shadow-sm flex justify-between items-center shrink-0 z-30">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">WBC Tokyo 2026</h1>
         </div>
-        
-        <div className="flex items-center gap-2">
-          {user ? (
-            <button onClick={handleLogout} className="flex items-center gap-2 p-1 bg-slate-50 border border-slate-100 rounded-full active:scale-95 transition-all">
-              <img src={user.photoURL} className="w-8 h-8 rounded-full border border-white" alt="avatar" />
-              <LogOut size={16} className="text-slate-400 mr-2" />
-            </button>
-          ) : (
-            <button onClick={handleLogin} className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-full text-[11px] font-black active:scale-95 transition-all shadow-lg shadow-blue-100">
-              <LogIn size={14} /> 登入雲端
-            </button>
-          )}
+        <div className="flex -space-x-2">
+          {members.map(m => (
+            <div key={m.id} className={`w-8 h-8 rounded-full border-2 border-white flex items-center justify-center text-[10px] font-bold text-white ${m.color}`}>
+              {m.name.charAt(0)}
+            </div>
+          ))}
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto pb-24 px-4 hide-scrollbar">
-        {activeTab === 'itinerary' && <ItineraryView scheduleItems={itineraryItems} setScheduleItems={setItineraryItems} isEditable={isEditable} />}
-        {activeTab === 'booking' && <BookingView flights={DEFAULT_FLIGHTS} setFlights={() => {}} transports={[]} setTransports={() => {}} hotels={[]} setHotels={() => {}} tickets={[]} setTickets={() => {}} restaurants={[]} setRestaurants={() => {}} members={members} isEditable={isEditable} />}
-        {activeTab === 'expenses' && <ExpenseView members={members} isEditable={isEditable} />}
-        {activeTab === 'shopping' && <ShoppingView items={shoppingItems} setItems={setShoppingItems} members={members} isEditable={isEditable} />}
-        {activeTab === 'prep' && <PrepView members={members} setMembers={setMembers} isEditable={isEditable} />}
+      <main className="flex-1 overflow-y-auto pb-24 px-4">
+        {renderContent()}
       </main>
 
-      <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-200 px-2 pb-8 pt-3 flex justify-around items-center z-50">
-        {[
-          { id: 'itinerary', icon: Calendar, label: '行程' },
-          { id: 'booking', icon: Plane, label: '預訂' },
-          { id: 'expenses', icon: Wallet, label: '記帳' },
-          { id: 'shopping', icon: ShoppingBag, label: '購物' },
-          { id: 'prep', icon: ClipboardList, label: '設定' },
-        ].map((item) => (
+      <nav className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-lg border-t border-slate-200 px-2 pb-8 pt-3 flex justify-around items-center z-50">
+        {navItems.map((item) => (
           <button
             key={item.id}
             onClick={() => setActiveTab(item.id as TabType)}
-            className={`flex flex-col items-center gap-1 transition-all duration-200 px-4 py-1 rounded-2xl ${activeTab === item.id ? 'text-blue-600' : 'text-slate-400'}`}
+            className={`flex flex-col items-center gap-1 transition-all duration-200 px-4 py-1 rounded-2xl ${
+              activeTab === item.id ? 'text-blue-600' : 'text-slate-400'
+            }`}
           >
-            <item.icon size={20} strokeWidth={activeTab === item.id ? 2.5 : 2} />
-            <span className={`text-[10px] font-black ${activeTab === item.id ? 'opacity-100' : 'opacity-70'}`}>{item.label}</span>
+            <item.icon size={22} strokeWidth={activeTab === item.id ? 2.5 : 2} />
+            <span className={`text-[10px] font-bold ${activeTab === item.id ? 'opacity-100' : 'opacity-70'}`}>
+              {item.label}
+            </span>
           </button>
         ))}
       </nav>
