@@ -10,7 +10,7 @@ import ExpenseView from './components/ExpenseView.tsx';
 import ShoppingView from './components/ShoppingView.tsx';
 import PrepView from './components/PrepView.tsx';
 
-// 指定同步的雲端文件路徑
+// 指定唯一的同步文件路徑
 const tripDocRef = doc(db, 'trips', 'main_trip_data');
 
 const App: React.FC = () => {
@@ -20,7 +20,7 @@ const App: React.FC = () => {
   const [retryCount, setRetryCount] = useState(0);
   const isCloudUpdate = useRef(false);
 
-  // --- 全域資料狀態 ---
+  // --- 初始預設資料 ---
   const [tripConfig, setTripConfig] = useState<TripConfig>({
     name: 'WBC Tokyo 2026',
     startDate: '2026-03-05',
@@ -44,130 +44,81 @@ const App: React.FC = () => {
   const [packing, setPacking] = useState<ChecklistItem[]>([]);
   const [notes, setNotes] = useState<NoteItem[]>([]);
 
-  // --- 啟動時自動讀取舊有的資料 ---
+  // --- 核心同步邏輯 ---
   useEffect(() => {
-    let unsubscribe = () => {};
+    console.log("正在嘗試從雲端同步...");
     
-    const startSync = async () => {
-      try {
-        // 先嘗試獲取一次，確認權限
-        await getDoc(tripDocRef);
-        setPermissionError(false);
-      } catch (e: any) {
-        if (e.message.includes("permission")) {
-          setPermissionError(true);
-        }
+    const unsubscribe = onSnapshot(tripDocRef, (snap) => {
+      if (snap.metadata.hasPendingWrites) return;
+
+      if (snap.exists()) {
+        const cloud = snap.data();
+        console.log("✅ 偵測到雲端資料更新");
+        isCloudUpdate.current = true;
+        
+        if (cloud.tripConfig) setTripConfig(cloud.tripConfig);
+        if (cloud.members) setMembers(cloud.members);
+        if (cloud.flights) setFlights(cloud.flights);
+        if (cloud.transports) setTransports(cloud.transports);
+        if (cloud.hotels) setHotels(cloud.hotels);
+        if (cloud.tickets) setTickets(cloud.tickets);
+        if (cloud.restaurants) setRestaurants(cloud.restaurants);
+        if (cloud.shoppingItems) setShoppingItems(cloud.shoppingItems);
+        if (cloud.scheduleItems) setScheduleItems(cloud.scheduleItems);
+        if (cloud.expenses) setExpenses(cloud.expenses);
+        if (cloud.exchangeRate) setExchangeRate(cloud.exchangeRate);
+        if (cloud.todo) setTodo(cloud.todo);
+        if (cloud.packing) setPacking(cloud.packing);
+        if (cloud.notes) setNotes(cloud.notes);
+        
+        setTimeout(() => { isCloudUpdate.current = false; }, 500);
+      } else {
+        // 重要：如果雲端是空的，立刻把預設資料寫上去
+        console.log("⚠️ 雲端無資料，正在執行初始化寫入...");
+        saveToCloud();
       }
+      setHasLoaded(true);
+      setPermissionError(false);
+    }, (error) => {
+      console.error("❌ Firestore 連接出錯:", error);
+      if (error.message.includes("permission")) setPermissionError(true);
+      setHasLoaded(true);
+    });
 
-      unsubscribe = onSnapshot(tripDocRef, (snap) => {
-        if (snap.metadata.hasPendingWrites) return;
-
-        if (snap.exists()) {
-          const cloud = snap.data();
-          isCloudUpdate.current = true;
-          
-          if (cloud.tripConfig) setTripConfig(cloud.tripConfig);
-          if (cloud.members) setMembers(cloud.members);
-          if (cloud.flights) setFlights(cloud.flights);
-          if (cloud.transports) setTransports(cloud.transports);
-          if (cloud.hotels) setHotels(cloud.hotels);
-          if (cloud.tickets) setTickets(cloud.tickets);
-          if (cloud.restaurants) setRestaurants(cloud.restaurants);
-          if (cloud.shoppingItems) setShoppingItems(cloud.shoppingItems);
-          if (cloud.scheduleItems) setScheduleItems(cloud.scheduleItems);
-          if (cloud.expenses) setExpenses(cloud.expenses);
-          if (cloud.exchangeRate) setExchangeRate(cloud.exchangeRate);
-          if (cloud.todo) setTodo(cloud.todo);
-          if (cloud.packing) setPacking(cloud.packing);
-          if (cloud.notes) setNotes(cloud.notes);
-          
-          setTimeout(() => { isCloudUpdate.current = false; }, 300);
-        } else {
-          // 首次啟動：嘗試寫入初始標記，若報錯則會進入 onError
-          setDoc(tripDocRef, { initialized: true }, { merge: true }).catch(() => {});
-        }
-        setHasLoaded(true);
-        setPermissionError(false);
-      }, (error) => {
-        console.error("Firestore Sync Failed:", error);
-        if (error.message.includes("permission")) {
-          setPermissionError(true);
-        }
-        setHasLoaded(true);
-      });
-    };
-
-    startSync();
     return () => unsubscribe();
   }, [retryCount]);
 
-  // --- 自動存入雲端：當本地修改時自動寫入 ---
+  // 封裝寫入函式
+  const saveToCloud = () => {
+    setDoc(tripDocRef, {
+      tripConfig, members, flights, transports, hotels, tickets, restaurants,
+      shoppingItems, scheduleItems, expenses, exchangeRate, todo, packing, notes,
+      updatedAt: new Date().toISOString()
+    }, { merge: true }).catch(err => {
+      console.error("❌ 寫入失敗:", err);
+    });
+  };
+
+  // 監聽本地變動自動儲存
   useEffect(() => {
     if (!hasLoaded || isCloudUpdate.current || permissionError) return;
-
     const timer = setTimeout(() => {
-      setDoc(tripDocRef, {
-        tripConfig, members, flights, transports, hotels, tickets, restaurants,
-        shoppingItems, scheduleItems, expenses, exchangeRate, todo, packing, notes
-      }, { merge: true }).catch(err => {
-        if (err.message.includes("permission")) setPermissionError(true);
-        console.error("Auto-Save Cloud Error:", err);
-      });
-    }, 1500);
-
+      console.log("💾 偵測到本地修改，正在自動儲存...");
+      saveToCloud();
+    }, 2000);
     return () => clearTimeout(timer);
-  }, [tripConfig, members, flights, transports, hotels, tickets, restaurants, shoppingItems, scheduleItems, expenses, exchangeRate, todo, packing, notes, hasLoaded, permissionError]);
+  }, [tripConfig, members, flights, transports, hotels, tickets, restaurants, shoppingItems, scheduleItems, expenses, exchangeRate, todo, packing, notes]);
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'itinerary':
-        return <ItineraryView 
-          startDate={tripConfig.startDate} endDate={tripConfig.endDate} 
-          scheduleItems={scheduleItems} setScheduleItems={setScheduleItems}
-          transports={transports}
-        />;
-      case 'booking':
-        return <BookingView 
-          flights={flights} setFlights={setFlights}
-          transports={transports} setTransports={setTransports}
-          hotels={hotels} setHotels={setHotels}
-          tickets={tickets} setTickets={setTickets}
-          restaurants={restaurants} setRestaurants={setRestaurants}
-          members={members} isEditable={true}
-        />;
-      case 'expenses':
-        return <ExpenseView 
-          members={members} isEditable={true} currencies={tripConfig.currencies}
-          expenses={expenses} setExpenses={setExpenses}
-          exchangeRate={exchangeRate} setExchangeRate={setExchangeRate}
-        />;
-      case 'shopping':
-        return <ShoppingView 
-          items={shoppingItems} setItems={setShoppingItems} 
-          members={members} isEditable={true} activeCurrencies={tripConfig.currencies} 
-        />;
-      case 'prep':
-        return (
-          <PrepView 
-            members={members} setMembers={setMembers} 
-            tripConfig={tripConfig} setTripConfig={setTripConfig}
-            todo={todo} setTodo={setTodo}
-            packing={packing} setPacking={setPacking}
-            notes={notes} setNotes={setNotes}
-          />
-        );
-      default:
-        return null;
+      case 'itinerary': return <ItineraryView startDate={tripConfig.startDate} endDate={tripConfig.endDate} scheduleItems={scheduleItems} setScheduleItems={setScheduleItems} transports={transports} />;
+      case 'booking': return <BookingView flights={flights} setFlights={setFlights} transports={transports} setTransports={setTransports} hotels={hotels} setHotels={setHotels} tickets={tickets} setTickets={setTickets} restaurants={restaurants} setRestaurants={setRestaurants} members={members} isEditable={true} />;
+      case 'expenses': return <ExpenseView members={members} isEditable={true} currencies={tripConfig.currencies} expenses={expenses} setExpenses={setExpenses} exchangeRate={exchangeRate} setExchangeRate={setExchangeRate} />;
+      case 'shopping': return <ShoppingView items={shoppingItems} setItems={setShoppingItems} members={members} isEditable={true} activeCurrencies={tripConfig.currencies} />;
+      case 'prep': return <PrepView members={members} setMembers={setMembers} tripConfig={tripConfig} setTripConfig={setTripConfig} todo={todo} setTodo={setTodo} packing={packing} setPacking={setPacking} notes={notes} setNotes={setNotes} />;
+      default: return null;
     }
   };
-
-  const navItems = [
-    { id: 'itinerary', icon: Calendar, label: '行程' },
-    { id: 'booking', icon: Plane, label: '預訂' },
-    { id: 'expenses', icon: Wallet, label: '記帳' },
-    { id: 'shopping', icon: ShoppingBag, label: '購物' },
-    { id: 'prep', icon: ClipboardList, label: '準備' },
-  ];
 
   return (
     <div className="flex flex-col h-screen bg-slate-100 text-slate-900">
@@ -183,72 +134,34 @@ const App: React.FC = () => {
         </div>
         <div className="flex -space-x-2">
           {members.map(m => (
-            <div key={m.id} className={`w-8 h-8 rounded-full border-2 border-white flex items-center justify-center text-[10px] font-bold text-white ${m.color}`}>
-              {m.name.charAt(0)}
-            </div>
+            <div key={m.id} className={`w-8 h-8 rounded-full border-2 border-white flex items-center justify-center text-[10px] font-bold text-white ${m.color}`}>{m.name.charAt(0)}</div>
           ))}
         </div>
       </header>
 
       <main className="flex-1 overflow-y-auto pb-24 px-4">
         {permissionError && (
-          <div className="mt-4 bg-slate-900 text-white p-6 rounded-[2.5rem] shadow-2xl border border-slate-800 space-y-4 animate-in slide-in-from-top duration-300">
-            <div className="flex items-start gap-4">
-              <div className="p-3 bg-red-500/20 rounded-2xl text-red-500 shrink-0">
-                <ShieldAlert size={24} />
-              </div>
-              <div>
-                <h3 className="text-sm font-black uppercase tracking-wider mb-1">Firestore 存取被拒</h3>
-                <p className="text-[11px] text-slate-400 font-bold leading-relaxed">
-                  請至您的 Firebase Console 更新「規則 (Rules)」如下：
-                </p>
-              </div>
-            </div>
-            
-            <div className="bg-white/5 rounded-2xl p-4 font-mono text-[9px] text-emerald-400 overflow-x-auto border border-white/10 select-all">
-              {`rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if true;
-    }
-  }
-}`}
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <button 
-                onClick={() => setRetryCount(prev => prev + 1)}
-                className="w-full py-3 bg-red-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 active:scale-95 transition-all shadow-lg shadow-red-500/20"
-              >
-                <RefreshCw size={14} /> 我已更新規則，重新連接
-              </button>
-              <a 
-                href="https://console.firebase.google.com/" 
-                target="_blank" 
-                className="w-full py-3 bg-slate-800 text-slate-300 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2"
-              >
-                <ExternalLink size={14} /> 前往 Firebase Console
-              </a>
-            </div>
+          <div className="mt-4 bg-slate-900 text-white p-6 rounded-[2.5rem] shadow-2xl border border-slate-800 space-y-4">
+            <h3 className="text-sm font-black uppercase tracking-wider mb-1">雲端連線失敗</h3>
+            <button onClick={() => setRetryCount(prev => prev + 1)} className="w-full py-3 bg-red-600 text-white rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-2">
+              <RefreshCw size={14} /> 點此強制重連
+            </button>
           </div>
         )}
         {renderContent()}
       </main>
 
       <nav className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-lg border-t border-slate-200 px-2 pb-8 pt-3 flex justify-around items-center z-50">
-        {navItems.map((item) => (
-          <button
-            key={item.id}
-            onClick={() => setActiveTab(item.id as TabType)}
-            className={`flex flex-col items-center gap-1 transition-all duration-200 px-4 py-1 rounded-2xl ${
-              activeTab === item.id ? 'text-blue-600' : 'text-slate-400'
-            }`}
-          >
+        {[
+          { id: 'itinerary', icon: Calendar, label: '行程' },
+          { id: 'booking', icon: Plane, label: '預訂' },
+          { id: 'expenses', icon: Wallet, label: '記帳' },
+          { id: 'shopping', icon: ShoppingBag, label: '購物' },
+          { id: 'prep', icon: ClipboardList, label: '準備' },
+        ].map((item) => (
+          <button key={item.id} onClick={() => setActiveTab(item.id as TabType)} className={`flex flex-col items-center gap-1 transition-all duration-200 px-4 py-1 rounded-2xl ${activeTab === item.id ? 'text-blue-600' : 'text-slate-400'}`}>
             <item.icon size={22} strokeWidth={activeTab === item.id ? 2.5 : 2} />
-            <span className={`text-[10px] font-bold ${activeTab === item.id ? 'opacity-100' : 'opacity-70'}`}>
-              {item.label}
-            </span>
+            <span className={`text-[10px] font-bold ${activeTab === item.id ? 'opacity-100' : 'opacity-70'}`}>{item.label}</span>
           </button>
         ))}
       </nav>
