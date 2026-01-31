@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'https://esm.sh/react@19.2.3';
-import { Plane, Hotel, Ticket as TicketIcon, Utensils, Calendar, Wallet, ShoppingBag, ClipboardList, Users, Globe, Check, ShieldCheck, ExternalLink } from 'https://esm.sh/lucide-react@0.563.0';
-import { doc, onSnapshot, setDoc, updateDoc } from 'https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js';
+import { Plane, Hotel, Ticket as TicketIcon, Utensils, Calendar, Wallet, ShoppingBag, ClipboardList, Users, Globe, Check, ShieldCheck, ExternalLink, AlertTriangle, RefreshCw, Key, ShieldAlert } from 'https://esm.sh/lucide-react@0.563.0';
+import { doc, onSnapshot, setDoc, getDoc } from 'https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js';
 import { db } from './firebase.ts';
 import { TabType, Flight, Transport, Accommodation, Ticket, Restaurant, Member, ShoppingItem, TripConfig, ScheduleItem, Transaction, ChecklistItem, NoteItem } from './types.ts';
 import { COLORS, DEFAULT_FLIGHTS, EXCHANGE_RATE } from './constants.tsx';
@@ -10,14 +10,17 @@ import ExpenseView from './components/ExpenseView.tsx';
 import ShoppingView from './components/ShoppingView.tsx';
 import PrepView from './components/PrepView.tsx';
 
-const tripDocRef = doc(db, 'trips', 'tokyo_wbc_2026_shared');
+// 指定同步的雲端文件路徑
+const tripDocRef = doc(db, 'trips', 'main_trip_data');
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('itinerary');
   const [hasLoaded, setHasLoaded] = useState(false);
+  const [permissionError, setPermissionError] = useState<boolean>(false);
+  const [retryCount, setRetryCount] = useState(0);
   const isCloudUpdate = useRef(false);
 
-  // --- 全域同步狀態 ---
+  // --- 全域資料狀態 ---
   const [tripConfig, setTripConfig] = useState<TripConfig>({
     name: 'WBC Tokyo 2026',
     startDate: '2026-03-05',
@@ -29,139 +32,100 @@ const App: React.FC = () => {
     { id: '2', name: 'Ping', color: 'bg-pink-500' }
   ]);
   const [flights, setFlights] = useState<Flight[]>(DEFAULT_FLIGHTS);
-  const [transports, setTransports] = useState<Transport[]>([
-    {
-      type: '新幹線',
-      name: 'NOZOMI226',
-      date: '2026/03/06',
-      from: '名古屋',
-      to: '東京',
-      departureTime: '10:06',
-      arrivalTime: '11:45',
-      duration: '1小時39分',
-      seatInfo: '',
-      note: '請將行李置於座位後方',
-      memberSeats: {
-        '1': { type: '指定席', seat: '6車 12-A' },
-        '2': { type: '指定席', seat: '6車 12-B' }
-      }
-    }
-  ]);
-  const [hotels, setHotels] = useState<Accommodation[]>([
-    {
-      name: 'Comfort Hotel Nagoya Meiekiminami',
-      address: '1 Chome-14-16 Meiekiminami, Nakamura Ward, Nagoya, Aichi 450-0003, Japan',
-      checkIn: '2026/03/05 15:00',
-      checkOut: '2026/03/10 10:00',
-      dates: '2026/03/05 - 2026/03/10',
-      price: 25000,
-      image: 'https://picsum.photos/800/400?random=1'
-    }
-  ]);
-  const [tickets, setTickets] = useState<Ticket[]>([
-    {
-      id: 't1',
-      category: '球賽票券',
-      event: 'WBC Pool C',
-      date: '2026/03/06',
-      time: '19:00',
-      teams: 'Japan vs Chinese Taipei',
-      section: 'A44',
-      row: '14',
-      seat: '389 & 390',
-      notes: '',
-      iconType: 'trophy'
-    }
-  ]);
-  const [restaurants, setRestaurants] = useState<Restaurant[]>([
-    { 
-      name: 'Peter Luger Steak House', 
-      date: '2026/03/06', 
-      time: '13:15',
-      address: '日本〒150-0013 Tokyo, Shibuya, Ebisu, 4 Chome−19−19 Peter Luger Steak House Tokyo',
-      reservedDishes: '平日午間套餐*2',
-      note: '不收現金',
-      iconType: 'steak'
-    }
-  ]);
-  const [shoppingItems, setShoppingItems] = useState<ShoppingItem[]>([
-    { id: '1', name: 'WBC 紀念球衣', category: '服飾', quantity: 1, note: 'XL號 藍色', jpyPrice: 12000, twdPrice: 3200, checked: false, memberId: '1', location: 'Tokyo Dome' }
-  ]);
-  const [scheduleItems, setScheduleItems] = useState<ScheduleItem[]>([
-    { 
-      id: '1', 
-      time: '05:35', 
-      event: '抵達桃園機場第二航廈', 
-      addr: 'Taoyuan International Airport T2', 
-      type: 'transport'
-    }
-  ]);
+  const [transports, setTransports] = useState<Transport[]>([]);
+  const [hotels, setHotels] = useState<Accommodation[]>([]);
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
+  const [shoppingItems, setShoppingItems] = useState<ShoppingItem[]>([]);
+  const [scheduleItems, setScheduleItems] = useState<ScheduleItem[]>([]);
   const [expenses, setExpenses] = useState<Transaction[]>([]);
   const [exchangeRate, setExchangeRate] = useState<string>(EXCHANGE_RATE.toString());
   const [todo, setTodo] = useState<ChecklistItem[]>([]);
   const [packing, setPacking] = useState<ChecklistItem[]>([]);
   const [notes, setNotes] = useState<NoteItem[]>([]);
 
-  // --- Firestore 監聽器 ---
+  // --- 啟動時自動讀取舊有的資料 ---
   useEffect(() => {
-    const unsubscribe = onSnapshot(tripDocRef, (snap) => {
-      if (snap.metadata.hasPendingWrites) return;
-
-      if (snap.exists()) {
-        const cloud = snap.data();
-        isCloudUpdate.current = true;
-        if (cloud.tripConfig) setTripConfig(cloud.tripConfig);
-        if (cloud.members) setMembers(cloud.members);
-        if (cloud.flights) setFlights(cloud.flights);
-        if (cloud.transports) setTransports(cloud.transports);
-        if (cloud.hotels) setHotels(cloud.hotels);
-        if (cloud.tickets) setTickets(cloud.tickets);
-        if (cloud.restaurants) setRestaurants(cloud.restaurants);
-        if (cloud.shoppingItems) setShoppingItems(cloud.shoppingItems);
-        if (cloud.scheduleItems) setScheduleItems(cloud.scheduleItems);
-        if (cloud.expenses) setExpenses(cloud.expenses);
-        if (cloud.exchangeRate) setExchangeRate(cloud.exchangeRate);
-        if (cloud.todo) setTodo(cloud.todo);
-        if (cloud.packing) setPacking(cloud.packing);
-        if (cloud.notes) setNotes(cloud.notes);
-        
-        setTimeout(() => { isCloudUpdate.current = false; }, 300);
-      }
-      setHasLoaded(true);
-    }, (error) => {
-      console.error("Firestore Error:", error);
-      setHasLoaded(true);
-    });
-    return () => unsubscribe();
-  }, []);
-
-  // --- 行程資料（ScheduleItems）即時同步機制 ---
-  useEffect(() => {
-    if (!hasLoaded || isCloudUpdate.current) return;
+    let unsubscribe = () => {};
     
-    updateDoc(tripDocRef, { scheduleItems }).catch(err => {
-      console.error("Immediate Itinerary Sync Error:", err);
-    });
-  }, [scheduleItems, hasLoaded]);
+    const startSync = async () => {
+      try {
+        // 先嘗試獲取一次，確認權限
+        await getDoc(tripDocRef);
+        setPermissionError(false);
+      } catch (e: any) {
+        if (e.message.includes("permission")) {
+          setPermissionError(true);
+        }
+      }
 
-  // --- 其他資料類別的自動儲存機制 ---
+      unsubscribe = onSnapshot(tripDocRef, (snap) => {
+        if (snap.metadata.hasPendingWrites) return;
+
+        if (snap.exists()) {
+          const cloud = snap.data();
+          isCloudUpdate.current = true;
+          
+          if (cloud.tripConfig) setTripConfig(cloud.tripConfig);
+          if (cloud.members) setMembers(cloud.members);
+          if (cloud.flights) setFlights(cloud.flights);
+          if (cloud.transports) setTransports(cloud.transports);
+          if (cloud.hotels) setHotels(cloud.hotels);
+          if (cloud.tickets) setTickets(cloud.tickets);
+          if (cloud.restaurants) setRestaurants(cloud.restaurants);
+          if (cloud.shoppingItems) setShoppingItems(cloud.shoppingItems);
+          if (cloud.scheduleItems) setScheduleItems(cloud.scheduleItems);
+          if (cloud.expenses) setExpenses(cloud.expenses);
+          if (cloud.exchangeRate) setExchangeRate(cloud.exchangeRate);
+          if (cloud.todo) setTodo(cloud.todo);
+          if (cloud.packing) setPacking(cloud.packing);
+          if (cloud.notes) setNotes(cloud.notes);
+          
+          setTimeout(() => { isCloudUpdate.current = false; }, 300);
+        } else {
+          // 首次啟動：嘗試寫入初始標記，若報錯則會進入 onError
+          setDoc(tripDocRef, { initialized: true }, { merge: true }).catch(() => {});
+        }
+        setHasLoaded(true);
+        setPermissionError(false);
+      }, (error) => {
+        console.error("Firestore Sync Failed:", error);
+        if (error.message.includes("permission")) {
+          setPermissionError(true);
+        }
+        setHasLoaded(true);
+      });
+    };
+
+    startSync();
+    return () => unsubscribe();
+  }, [retryCount]);
+
+  // --- 自動存入雲端：當本地修改時自動寫入 ---
   useEffect(() => {
-    if (!hasLoaded || isCloudUpdate.current) return;
+    if (!hasLoaded || isCloudUpdate.current || permissionError) return;
 
     const timer = setTimeout(() => {
       setDoc(tripDocRef, {
         tripConfig, members, flights, transports, hotels, tickets, restaurants,
-        shoppingItems, expenses, exchangeRate, todo, packing, notes
+        shoppingItems, scheduleItems, expenses, exchangeRate, todo, packing, notes
       }, { merge: true }).catch(err => {
-        console.error("Cloud Save Error:", err);
+        if (err.message.includes("permission")) setPermissionError(true);
+        console.error("Auto-Save Cloud Error:", err);
       });
-    }, 2000);
+    }, 1500);
 
     return () => clearTimeout(timer);
-  }, [tripConfig, members, flights, transports, hotels, tickets, restaurants, shoppingItems, expenses, exchangeRate, todo, packing, notes, hasLoaded]);
+  }, [tripConfig, members, flights, transports, hotels, tickets, restaurants, shoppingItems, scheduleItems, expenses, exchangeRate, todo, packing, notes, hasLoaded, permissionError]);
 
   const renderContent = () => {
     switch (activeTab) {
+      case 'itinerary':
+        return <ItineraryView 
+          startDate={tripConfig.startDate} endDate={tripConfig.endDate} 
+          scheduleItems={scheduleItems} setScheduleItems={setScheduleItems}
+          transports={transports}
+        />;
       case 'booking':
         return <BookingView 
           flights={flights} setFlights={setFlights}
@@ -170,12 +134,6 @@ const App: React.FC = () => {
           tickets={tickets} setTickets={setTickets}
           restaurants={restaurants} setRestaurants={setRestaurants}
           members={members} isEditable={true}
-        />;
-      case 'itinerary':
-        return <ItineraryView 
-          startDate={tripConfig.startDate} endDate={tripConfig.endDate} 
-          scheduleItems={scheduleItems} setScheduleItems={setScheduleItems}
-          transports={transports}
         />;
       case 'expenses':
         return <ExpenseView 
@@ -190,15 +148,13 @@ const App: React.FC = () => {
         />;
       case 'prep':
         return (
-          <div className="space-y-6">
-            <PrepView 
-              members={members} setMembers={setMembers} 
-              tripConfig={tripConfig} setTripConfig={setTripConfig}
-              todo={todo} setTodo={setTodo}
-              packing={packing} setPacking={setPacking}
-              notes={notes} setNotes={setNotes}
-            />
-          </div>
+          <PrepView 
+            members={members} setMembers={setMembers} 
+            tripConfig={tripConfig} setTripConfig={setTripConfig}
+            todo={todo} setTodo={setTodo}
+            packing={packing} setPacking={setPacking}
+            notes={notes} setNotes={setNotes}
+          />
         );
       default:
         return null;
@@ -218,6 +174,12 @@ const App: React.FC = () => {
       <header className="px-6 pt-12 pb-1 bg-white shadow-sm flex justify-between items-center shrink-0 z-30">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">{tripConfig.name}</h1>
+          <div className="flex items-center gap-1.5 mt-1">
+            <div className={`w-1.5 h-1.5 rounded-full ${permissionError ? 'bg-red-500' : 'bg-emerald-500 animate-pulse'}`}></div>
+            <span className={`text-[10px] font-black uppercase tracking-widest ${permissionError ? 'text-red-500' : 'text-emerald-500'}`}>
+              {permissionError ? '雲端權限拒絕' : '雲端讀寫就緒'}
+            </span>
+          </div>
         </div>
         <div className="flex -space-x-2">
           {members.map(m => (
@@ -229,6 +191,48 @@ const App: React.FC = () => {
       </header>
 
       <main className="flex-1 overflow-y-auto pb-24 px-4">
+        {permissionError && (
+          <div className="mt-4 bg-slate-900 text-white p-6 rounded-[2.5rem] shadow-2xl border border-slate-800 space-y-4 animate-in slide-in-from-top duration-300">
+            <div className="flex items-start gap-4">
+              <div className="p-3 bg-red-500/20 rounded-2xl text-red-500 shrink-0">
+                <ShieldAlert size={24} />
+              </div>
+              <div>
+                <h3 className="text-sm font-black uppercase tracking-wider mb-1">Firestore 存取被拒</h3>
+                <p className="text-[11px] text-slate-400 font-bold leading-relaxed">
+                  請至您的 Firebase Console 更新「規則 (Rules)」如下：
+                </p>
+              </div>
+            </div>
+            
+            <div className="bg-white/5 rounded-2xl p-4 font-mono text-[9px] text-emerald-400 overflow-x-auto border border-white/10 select-all">
+              {`rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}`}
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <button 
+                onClick={() => setRetryCount(prev => prev + 1)}
+                className="w-full py-3 bg-red-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 active:scale-95 transition-all shadow-lg shadow-red-500/20"
+              >
+                <RefreshCw size={14} /> 我已更新規則，重新連接
+              </button>
+              <a 
+                href="https://console.firebase.google.com/" 
+                target="_blank" 
+                className="w-full py-3 bg-slate-800 text-slate-300 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2"
+              >
+                <ExternalLink size={14} /> 前往 Firebase Console
+              </a>
+            </div>
+          </div>
+        )}
         {renderContent()}
       </main>
 

@@ -1,0 +1,11 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 確保所有文件的讀取與寫入對公共開放，以支援自動存取功能。
+    // 請將此內容貼至 Firebase Console > Firestore Database > Rules 中。
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}
