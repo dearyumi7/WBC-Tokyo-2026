@@ -20,7 +20,7 @@ const App: React.FC = () => {
   const [retryCount, setRetryCount] = useState(0);
   const isCloudUpdate = useRef(false);
 
-  // --- 初始預設資料 ---
+  // --- 狀態定義 ---
   const [tripConfig, setTripConfig] = useState<TripConfig>({
     name: 'WBC Tokyo 2026',
     startDate: '2026-03-05',
@@ -44,16 +44,43 @@ const App: React.FC = () => {
   const [packing, setPacking] = useState<ChecklistItem[]>([]);
   const [notes, setNotes] = useState<NoteItem[]>([]);
 
-  // --- 核心同步邏輯 ---
+  // --- 封裝寫入函式 (核心修正) ---
+  const saveToCloud = () => {
+    console.log("📤 正在同步資料到 Firebase...");
+    setDoc(tripDocRef, {
+      tripConfig, 
+      members, 
+      flights, 
+      transports, 
+      hotels, 
+      tickets, 
+      restaurants,
+      shoppingItems, 
+      scheduleItems, 
+      expenses, 
+      exchangeRate, 
+      todo, 
+      packing, 
+      notes,
+      lastUpdated: new Date().toISOString(), // 統一使用 lastUpdated 欄位
+      initialized: true
+    }, { merge: true }).then(() => {
+      console.log("✅ 同步完成");
+    }).catch(err => {
+      console.error("❌ 寫入失敗:", err);
+    });
+  };
+
+  // --- 核心同步邏輯 (監聽雲端) ---
   useEffect(() => {
-    console.log("正在嘗試從雲端同步...");
+    console.log("📡 啟動實時同步監聽...");
     
     const unsubscribe = onSnapshot(tripDocRef, (snap) => {
       if (snap.metadata.hasPendingWrites) return;
 
       if (snap.exists()) {
         const cloud = snap.data();
-        console.log("✅ 偵測到雲端資料更新");
+        console.log("📥 收到雲端更新:", cloud.lastUpdated);
         isCloudUpdate.current = true;
         
         if (cloud.tripConfig) setTripConfig(cloud.tripConfig);
@@ -73,8 +100,7 @@ const App: React.FC = () => {
         
         setTimeout(() => { isCloudUpdate.current = false; }, 500);
       } else {
-        // 重要：如果雲端是空的，立刻把預設資料寫上去
-        console.log("⚠️ 雲端無資料，正在執行初始化寫入...");
+        console.log("⚠️ 雲端為空，準備初始化...");
         saveToCloud();
       }
       setHasLoaded(true);
@@ -88,25 +114,17 @@ const App: React.FC = () => {
     return () => unsubscribe();
   }, [retryCount]);
 
-  // 封裝寫入函式
-  const saveToCloud = () => {
-    setDoc(tripDocRef, {
-      tripConfig, members, flights, transports, hotels, tickets, restaurants,
-      shoppingItems, scheduleItems, expenses, exchangeRate, todo, packing, notes,
-      updatedAt: new Date().toISOString()
-    }, { merge: true }).catch(err => {
-      console.error("❌ 寫入失敗:", err);
-    });
-  };
-
-  // 監聽本地變動自動儲存
+  // --- 監聽本地變動自動儲存 ---
   useEffect(() => {
+    // 只有在資料已載入、且不是因為雲端推過來才儲存
     if (!hasLoaded || isCloudUpdate.current || permissionError) return;
+    
     const timer = setTimeout(() => {
-      console.log("💾 偵測到本地修改，正在自動儲存...");
       saveToCloud();
-    }, 2000);
+    }, 1000); // 縮短至 1 秒，讓更新更即時
+    
     return () => clearTimeout(timer);
+    // 這裡列出所有需要被監控的狀態
   }, [tripConfig, members, flights, transports, hotels, tickets, restaurants, shoppingItems, scheduleItems, expenses, exchangeRate, todo, packing, notes]);
 
   const renderContent = () => {

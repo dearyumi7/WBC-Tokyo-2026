@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useRef, useMemo } from 'https://esm.sh/react@19.2.3';
-import { MapPin, Navigation, Plus, Sun, Cloud, Clock, Wind, Edit3, Check, X, Info, Trash2, Train, Bus, Car, Plane, Footprints, ChevronRight, ArrowRight, ChevronDown, ChevronUp, StickyNote, DollarSign, GripVertical, History, Utensils, ShoppingBag, Map as MapIcon, Loader2, ArrowLeft, BookOpen, Settings, ListPlus, Bold, Italic, Type, Palette, Minus, ExternalLink, Link, Image, Search } from 'https://esm.sh/lucide-react@0.563.0';
+import { MapPin, Navigation, Plus, Sun, Cloud, Clock, Wind, Edit3, Check, X, Info, Trash2, Train, Bus, Car, Plane, Footprints, ChevronRight, ArrowRight, ChevronDown, ChevronUp, StickyNote, DollarSign, GripVertical, History, Utensils, ShoppingBag, Map as MapIcon, Loader2, ArrowLeft, BookOpen, Settings, ListPlus, Bold, Italic, Type, Palette, Minus, ExternalLink, Link, Image, Search, AlertTriangle } from 'https://esm.sh/lucide-react@0.563.0';
 import { Transport, TransportTransfer } from '../types.ts';
+
+import { db } from '../firebase.ts';
+import { doc, updateDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js';
 
 interface CustomDetail {
   id: string; // 新增唯一 ID 確保排序時組件能正確對應
@@ -125,7 +128,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ initialValue, onChange 
       {isLocationModalOpen && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center px-6">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsLocationModalOpen(false)}></div>
-          <div className="relative w-full max-w-sm bg-white rounded-[2rem] shadow-2xl p-6 animate-in zoom-in-95 duration-200">
+          <div className="relative w-full max-sm bg-white rounded-[2rem] shadow-2xl p-6 animate-in zoom-in-95 duration-200">
             <div className="flex justify-between items-center mb-4">
               <h4 className="font-black text-slate-800 flex items-center gap-2">
                 <MapPin size={18} className="text-blue-500" /> 插入地圖連結
@@ -214,6 +217,9 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
   const [isTransportModalOpen, setIsTransportModalOpen] = useState(false);
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   
+  // 新增：處理刪除確認狀態
+  const [itemToDeleteId, setItemToDeleteId] = useState<string | null>(null);
+
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
   const [draggedDetailId, setDraggedDetailId] = useState<string | null>(null);
 
@@ -222,6 +228,26 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
   const [editingItem, setEditingItem] = useState<ScheduleItem | null>(null);
   const [activeTransportItem, setActiveTransportItem] = useState<ScheduleItem | null>(null);
   const [activeNoteItem, setActiveNoteItem] = useState<ScheduleItem | null>(null);
+
+
+// --- 貼在第 229 行 ---
+  React.useEffect(() => {
+    // 確保資料庫有連上
+    if (!db) return;
+    const tripRef = doc(db, 'trips', 'main_trip_data');
+    // 開始監聽雲端，只要雲端有變動，畫面就自動更新
+    const unsubscribe = onSnapshot(tripRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data.scheduleItems) {
+          setScheduleItems(data.scheduleItems);
+          console.log("📡 雲端最新行程已送達！");
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
 
   // 計算行程日期標籤
   const days = useMemo(() => {
@@ -420,20 +446,38 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
 
   const handleSave = () => {
     if (!formData.event || !formData.time) return;
+    let newList = editingItem 
+      ? scheduleItems.map(item => item.id === editingItem.id ? { ...item, ...formData } : item)
+      : [...scheduleItems, { ...formData, id: Date.now().toString() }];
 
-    if (editingItem) {
-      setScheduleItems(prev => prev.map(item => item.id === editingItem.id ? { ...item, ...formData as ScheduleItem } : item));
-    } else {
-      setScheduleItems(prev => [...prev, { ...formData as ScheduleItem, id: Date.now().toString() }]);
-    }
+    setScheduleItems(newList);
     setIsModalOpen(false);
+
+    // 強迫寫入 Firebase
+    const tripRef = doc(db, 'trips', 'main_trip_data');
+    updateDoc(tripRef, { scheduleItems: newList })
+      .then(() => console.log("✅ 真正存入資料庫了"))
+      .catch(e => alert("存入失敗：" + e.message));
   };
 
+  // 修正：刪除按鈕改為開啟確認彈窗
   const handleDelete = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (window.confirm('確定要刪除此行程嗎？')) {
-      setScheduleItems(prev => prev.filter(item => item.id !== id));
-    }
+    setItemToDeleteId(id);
+  };
+
+  // 新增：真正執行刪除並同步雲端
+  const confirmDelete = () => {
+    if (!itemToDeleteId) return;
+    const newList = scheduleItems.filter(item => item.id !== itemToDeleteId);
+    setScheduleItems(newList);
+    setItemToDeleteId(null);
+
+    // 同步雲端以防止 onSnapshot 覆寫回本地
+    const tripRef = doc(db, 'trips', 'main_trip_data');
+    updateDoc(tripRef, { scheduleItems: newList })
+      .then(() => console.log("✅ 行程已從雲端移除"))
+      .catch(e => console.error("雲端刪除失敗：", e));
   };
 
   const openTransportModal = (item: ScheduleItem, e: React.MouseEvent) => {
@@ -515,22 +559,32 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
 
   const handleSaveTransport = () => {
     if (!activeTransportItem) return;
-    setScheduleItems(prev => prev.map(item => 
+    const newList = scheduleItems.map(item => 
       item.id === activeTransportItem.id 
       ? { ...item, plannedTransport: transportFormData } 
       : item
-    ));
+    );
+    setScheduleItems(newList);
     setIsTransportModalOpen(false);
+    
+    // 同步雲端
+    const tripRef = doc(db, 'trips', 'main_trip_data');
+    updateDoc(tripRef, { scheduleItems: newList });
   };
 
   const handleSaveNote = () => {
     if (!activeNoteItem) return;
-    setScheduleItems(prev => prev.map(item => 
+    const newList = scheduleItems.map(item => 
       item.id === activeNoteItem.id 
       ? { ...item, customNote: noteFormData } 
       : item
-    ));
+    );
+    setScheduleItems(newList);
     setIsNoteModalOpen(false);
+
+    // 同步雲端
+    const tripRef = doc(db, 'trips', 'main_trip_data');
+    updateDoc(tripRef, { scheduleItems: newList });
   };
 
   const handleAddDetailSection = () => {
@@ -575,6 +629,11 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
       if (draggedIndex !== -1 && targetIndex !== -1) {
         const [draggedItem] = newList.splice(draggedIndex, 1);
         newList.splice(targetIndex, 0, draggedItem);
+        
+        // 拖曳結束同步雲端
+        const tripRef = doc(db, 'trips', 'main_trip_data');
+        updateDoc(tripRef, { scheduleItems: newList });
+        
         return newList;
       }
       return prev;
@@ -928,6 +987,26 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
           )}
         </div>
       </div>
+
+      {/* 刪除確認自定義彈窗 */}
+      {itemToDeleteId && (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center px-6">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setItemToDeleteId(null)}></div>
+          <div className="relative w-full max-w-sm bg-white rounded-[2.5rem] shadow-2xl p-8 text-center animate-in zoom-in-95 duration-200">
+            <div className="w-16 h-16 bg-red-50 rounded-3xl flex items-center justify-center text-red-500 mx-auto mb-4">
+              <AlertTriangle size={32} />
+            </div>
+            <h3 className="text-xl font-black text-slate-800 mb-2">確定要刪除嗎？</h3>
+            <p className="text-sm text-slate-500 font-medium mb-8 leading-relaxed">
+              「{scheduleItems.find(i => i.id === itemToDeleteId)?.event}」行程刪除後將無法復原。
+            </p>
+            <div className="flex flex-col gap-3">
+              <button onClick={confirmDelete} className="w-full py-4 bg-red-500 text-white rounded-2xl font-bold shadow-lg shadow-red-100 active:scale-95 transition-all">確認刪除</button>
+              <button onClick={() => setItemToDeleteId(null)} className="w-full py-4 bg-slate-100 text-slate-500 rounded-2xl font-bold active:scale-95 transition-all">取消</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {selectedSpotForDetail && (
         <div className="fixed inset-0 z-[200] bg-white animate-in slide-in-from-right duration-500 overflow-y-auto hide-scrollbar">
@@ -1287,8 +1366,12 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
                     onClick={() => {
                       if (window.confirm('確定要移除此交通規劃嗎？')) {
                         setTransportFormData({ price: 0, currency: 'JPY', transfers: [] });
-                        setScheduleItems(prev => prev.map(item => item.id === activeTransportItem?.id ? { ...item, plannedTransport: undefined } : item));
+                        const newList = scheduleItems.map(item => item.id === activeTransportItem?.id ? { ...item, plannedTransport: undefined } : item);
+                        setScheduleItems(newList);
                         setIsTransportModalOpen(false);
+                        // 同步雲端
+                        const tripRef = doc(db, 'trips', 'main_trip_data');
+                        updateDoc(tripRef, { scheduleItems: newList });
                       }
                     }} 
                     className="px-4 py-4 bg-red-50 text-red-500 rounded-2xl font-bold active:scale-95 transition-all"
@@ -1309,7 +1392,7 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
       {isNoteModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-end justify-center px-4 pb-4">
           <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setIsNoteModalOpen(false)}></div>
-          <div className="relative w-full max-w-lg bg-white rounded-[2.5rem] shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-300">
+          <div className="relative w-full max-sm bg-white rounded-[2.5rem] shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-300">
             <div className="p-6">
               <div className="flex justify-between items-center mb-6 px-1">
                 <h3 className="text-xl font-black flex items-center gap-2">
@@ -1337,8 +1420,12 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
                     onClick={() => {
                       if (window.confirm('確定要移除此備註嗎？')) {
                         setNoteFormData('');
-                        setScheduleItems(prev => prev.map(item => item.id === activeNoteItem?.id ? { ...item, customNote: undefined } : item));
+                        const newList = scheduleItems.map(item => item.id === activeNoteItem?.id ? { ...item, customNote: undefined } : item);
+                        setScheduleItems(newList);
                         setIsNoteModalOpen(false);
+                        // 同步雲端
+                        const tripRef = doc(db, 'trips', 'main_trip_data');
+                        updateDoc(tripRef, { scheduleItems: newList });
                       }
                     }} 
                     className="px-4 py-4 bg-red-50 text-red-500 rounded-2xl font-bold active:scale-95 transition-all"
