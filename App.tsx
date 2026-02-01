@@ -140,14 +140,19 @@ const App: React.FC = () => {
 
   return (
     <div className="flex flex-col h-screen bg-slate-100 text-slate-900">
-      <header className="px-5 pt-1.5 pb-1.5 bg-white shadow-sm flex justify-between items-center shrink-0 z-30">
-        <div className="flex items-center gap-3">
-          <h1 className="text-lg font-bold tracking-tight">{tripConfig.name}</h1>
-          <div className={`w-1.5 h-1.5 rounded-full ${permissionError ? 'bg-red-500' : 'bg-emerald-500 animate-pulse'}`}></div>
+      <header className="px-5 pt-3 pb-2 bg-white shadow-sm flex justify-between items-center shrink-0 z-30">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight">{tripConfig.name}</h1>
+          <div className="flex items-center gap-1.5 mt-0.5">
+            <div className={`w-1 h-1 rounded-full ${permissionError ? 'bg-red-500' : 'bg-emerald-500 animate-pulse'}`}></div>
+            <span className={`text-[8px] font-black uppercase tracking-widest ${permissionError ? 'text-red-500' : 'text-emerald-500'}`}>
+              {permissionError ? '雲端權限拒絕' : '雲端讀寫就緒'}
+            </span>
+          </div>
         </div>
         <div className="flex -space-x-1.5">
           {members.map(m => (
-            <div key={m.id} className={`w-6 h-6 rounded-full border border-white flex items-center justify-center text-[8px] font-bold text-white ${m.color}`}>{m.name.charAt(0)}</div>
+            <div key={m.id} className={`w-7 h-7 rounded-full border-2 border-white flex items-center justify-center text-[9px] font-bold text-white ${m.color}`}>{m.name.charAt(0)}</div>
           ))}
         </div>
       </header>
