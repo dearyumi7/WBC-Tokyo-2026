@@ -3,13 +3,13 @@ import { getFirestore, enableIndexedDbPersistence } from 'https://www.gstatic.co
 
 // 嚴格依照使用者提供的 Firebase SDK 配置
 const firebaseConfig = {
-  apiKey: "AIzaSyBuOD8-PHR8KCzRqL09JTzGkhGNss0OnEc",
-  authDomain: "wbc-tokyo-2026.firebaseapp.com",
-  projectId: "wbc-tokyo-2026",
-  storageBucket: "wbc-tokyo-2026.firebasestorage.app",
-  messagingSenderId: "198769055995",
-  appId: "1:198769055995:web:85c4d584ac56869ebab85e",
-  measurementId: "G-4J288J7EQJ"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
 const app = initializeApp(firebaseConfig);
