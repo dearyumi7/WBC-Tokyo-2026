@@ -17,8 +17,8 @@ interface ScheduleItem {
   event: string;
   addr: string;
   type: string;
-  plannedTransport?: Partial<Transport>;
-  customNote?: string;
+  plannedTransport?: Partial<Transport> | null;
+  customNote?: string | null;
   price?: number;
   currency?: 'JPY' | 'TWD' | string;
   customDetails?: CustomDetail[];
@@ -219,6 +219,7 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
   
   // 新增：處理刪除確認狀態
   const [itemToDeleteId, setItemToDeleteId] = useState<string | null>(null);
+  const [isTransportDeleteConfirmOpen, setIsTransportDeleteConfirmOpen] = useState(false);
 
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
   const [draggedDetailId, setDraggedDetailId] = useState<string | null>(null);
@@ -522,6 +523,7 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
 
     setExpandedTransports(prev => {
       const newState = { ...prev, [id]: nextState };
+      // Fix: Change 'newList' to 'newState' to resolve the reference error and properly persist the expanded states.
       localStorage.setItem('itinerary_expanded_states', JSON.stringify(newState));
       return newState;
     });
@@ -988,11 +990,11 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
         </div>
       </div>
 
-      {/* 刪除確認自定義彈窗 */}
+      {/* 刪除確認自定義彈窗 (行程項目) */}
       {itemToDeleteId && (
         <div className="fixed inset-0 z-[250] flex items-center justify-center px-6">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setItemToDeleteId(null)}></div>
-          <div className="relative w-full max-w-sm bg-white rounded-[2.5rem] shadow-2xl p-8 text-center animate-in zoom-in-95 duration-200">
+          <div className="relative w-full max-sm bg-white rounded-[2.5rem] shadow-2xl p-8 text-center animate-in zoom-in-95 duration-200">
             <div className="w-16 h-16 bg-red-50 rounded-3xl flex items-center justify-center text-red-500 mx-auto mb-4">
               <AlertTriangle size={32} />
             </div>
@@ -1003,6 +1005,42 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
             <div className="flex flex-col gap-3">
               <button onClick={confirmDelete} className="w-full py-4 bg-red-500 text-white rounded-2xl font-bold shadow-lg shadow-red-100 active:scale-95 transition-all">確認刪除</button>
               <button onClick={() => setItemToDeleteId(null)} className="w-full py-4 bg-slate-100 text-slate-500 rounded-2xl font-bold active:scale-95 transition-all">取消</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 刪除確認自定義彈窗 (交通規劃) */}
+      {isTransportDeleteConfirmOpen && (
+        <div className="fixed inset-0 z-[260] flex items-center justify-center px-6">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsTransportDeleteConfirmOpen(false)}></div>
+          <div className="relative w-full max-w-sm bg-white rounded-[2.5rem] shadow-2xl p-8 text-center animate-in zoom-in-95 duration-200">
+            <div className="w-16 h-16 bg-red-50 rounded-3xl flex items-center justify-center text-red-500 mx-auto mb-4">
+              <AlertTriangle size={32} />
+            </div>
+            <h3 className="text-xl font-black text-slate-800 mb-2">移除交通規劃？</h3>
+            <p className="text-sm text-slate-500 font-medium mb-8 leading-relaxed">
+              確定要移除此行程的交通安排嗎？
+            </p>
+            <div className="flex flex-col gap-3">
+              <button 
+                onClick={() => {
+                  if (activeTransportItem) {
+                    const newList = scheduleItems.map(item => item.id === activeTransportItem.id ? { ...item, plannedTransport: null } : item);
+                    setScheduleItems(newList);
+                    setTransportFormData({ price: 0, currency: 'JPY', transfers: [] });
+                    setIsTransportDeleteConfirmOpen(false);
+                    setIsTransportModalOpen(false);
+                    // 同步雲端
+                    const tripRef = doc(db, 'trips', 'main_trip_data');
+                    updateDoc(tripRef, { scheduleItems: newList });
+                  }
+                }} 
+                className="w-full py-4 bg-red-500 text-white rounded-2xl font-bold shadow-lg shadow-red-100 active:scale-95 transition-all"
+              >
+                確認移除
+              </button>
+              <button onClick={() => setIsTransportDeleteConfirmOpen(false)} className="w-full py-4 bg-slate-100 text-slate-500 rounded-2xl font-bold active:scale-95 transition-all">取消</button>
             </div>
           </div>
         </div>
@@ -1174,9 +1212,7 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
 
               <div className="mt-8 flex gap-3">
                 <button onClick={() => setIsModalOpen(false)} className="flex-1 py-4 bg-slate-100 rounded-2xl font-bold text-slate-500 active:scale-95 transition-all">取消</button>
-                <button onClick={handleSave} disabled={!formData.event} className="flex-1 py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50">
-                  <Check size={18} /> {editingItem ? '儲存修改' : '加入行程'}
-                </button>
+                <button onClick={handleSave} disabled={!formData.event} className="flex-1 py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50"><Check size={18} /> {editingItem ? '儲存修改' : '加入行程'}</button>
               </div>
             </div>
           </div>
@@ -1363,17 +1399,7 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
               <div className="mt-8 flex gap-3">
                 {activeTransportItem?.plannedTransport && (
                   <button 
-                    onClick={() => {
-                      if (window.confirm('確定要移除此交通規劃嗎？')) {
-                        setTransportFormData({ price: 0, currency: 'JPY', transfers: [] });
-                        const newList = scheduleItems.map(item => item.id === activeTransportItem?.id ? { ...item, plannedTransport: undefined } : item);
-                        setScheduleItems(newList);
-                        setIsTransportModalOpen(false);
-                        // 同步雲端
-                        const tripRef = doc(db, 'trips', 'main_trip_data');
-                        updateDoc(tripRef, { scheduleItems: newList });
-                      }
-                    }} 
+                    onClick={() => setIsTransportDeleteConfirmOpen(true)} 
                     className="px-4 py-4 bg-red-50 text-red-500 rounded-2xl font-bold active:scale-95 transition-all"
                   >
                     <Trash2 size={20} />
@@ -1420,7 +1446,7 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
                     onClick={() => {
                       if (window.confirm('確定要移除此備註嗎？')) {
                         setNoteFormData('');
-                        const newList = scheduleItems.map(item => item.id === activeNoteItem?.id ? { ...item, customNote: undefined } : item);
+                        const newList = scheduleItems.map(item => item.id === activeNoteItem?.id ? { ...item, customNote: null } : item);
                         setScheduleItems(newList);
                         setIsNoteModalOpen(false);
                         // 同步雲端

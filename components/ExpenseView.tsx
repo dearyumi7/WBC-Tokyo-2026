@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'https://esm.sh/react@19.2.3';
-import { Wallet, Repeat, Plus, Users, Landmark, X, Check, Calendar, MapPin, Tag, CreditCard, Lock, LockOpen } from 'https://esm.sh/lucide-react@0.563.0';
+import { Wallet, Repeat, Plus, Users, Landmark, X, Check, Calendar, MapPin, Tag, CreditCard, Lock, LockOpen, Trash2, AlertTriangle } from 'https://esm.sh/lucide-react@0.563.0';
 import { EXCHANGE_RATE as DEFAULT_RATE } from '../constants';
 import { Member, Transaction } from '../types';
 
@@ -7,6 +7,10 @@ interface ExpenseViewProps {
   members: Member[];
   isEditable: boolean;
   currencies: string[];
+  expenses: Transaction[];
+  setExpenses: React.Dispatch<React.SetStateAction<Transaction[]>>;
+  exchangeRate: string;
+  setExchangeRate: React.Dispatch<React.SetStateAction<string>>;
 }
 
 const CATEGORIES = [
@@ -18,27 +22,18 @@ const CATEGORIES = [
   { label: '其他', icon: '✨' },
 ];
 
-const ExpenseView: React.FC<ExpenseViewProps> = ({ members, isEditable, currencies }) => {
-  const [exchangeRate, setExchangeRate] = useState<string>(() => {
-    const saved = localStorage.getItem('tokyo_wbc_exchange_rate');
-    return saved !== null ? saved : DEFAULT_RATE.toString();
-  });
+const ExpenseView: React.FC<ExpenseViewProps> = ({ members, isEditable, currencies, expenses, setExpenses, exchangeRate, setExchangeRate }) => {
   const [isRateLocked, setIsRateLocked] = useState<boolean>(() => {
     return localStorage.getItem('tokyo_wbc_rate_locked') === 'true';
   });
 
   const [splitCurrency, setSplitCurrency] = useState<string>(currencies[0] || 'JPY');
+  const [expenseToDelete, setExpenseToDelete] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   useEffect(() => {
-    localStorage.setItem('tokyo_wbc_exchange_rate', exchangeRate);
     localStorage.setItem('tokyo_wbc_rate_locked', isRateLocked.toString());
-  }, [exchangeRate, isRateLocked]);
-
-  const [expenses, setExpenses] = useState<Transaction[]>([
-    { id: '1', date: '2026-03-05', category: '美食', amount: 3500, twdAmount: 3500 * DEFAULT_RATE, currency: 'JPY', payer: members[0]?.id || '1', location: '一蘭拉麵', splitWith: members.map(m => m.id) },
-    { id: '2', date: '2026-03-05', category: '交通', amount: 1500, twdAmount: 1500 * DEFAULT_RATE, currency: 'JPY', payer: members[1]?.id || '2', location: 'Suica 加值', splitWith: members.map(m => m.id) },
-    { id: '3', date: '2026-03-06', category: '購物', amount: 12000, twdAmount: 12000 * DEFAULT_RATE, currency: 'JPY', payer: members[0]?.id || '1', location: 'Don Quijote', splitWith: members.map(m => m.id) },
-  ]);
+  }, [isRateLocked]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState<Partial<Transaction>>({
@@ -162,7 +157,7 @@ const ExpenseView: React.FC<ExpenseViewProps> = ({ members, isEditable, currenci
     const twdAmount = formData.currency === 'JPY' ? amount * effectiveRate : amount;
 
     const newExpense: Transaction = {
-      id: Date.now().toString(),
+      id: editingId || Date.now().toString(),
       date: formData.date || new Date().toISOString().split('T')[0],
       category: formData.category || '其他',
       amount: amount,
@@ -173,8 +168,14 @@ const ExpenseView: React.FC<ExpenseViewProps> = ({ members, isEditable, currenci
       splitWith: formData.splitWith && formData.splitWith.length > 0 ? formData.splitWith : members.map(m => m.id),
     };
 
-    setExpenses([newExpense, ...expenses]);
+    if (editingId) {
+      setExpenses(expenses.map(e => e.id === editingId ? newExpense : e));
+    } else {
+      setExpenses([newExpense, ...expenses]);
+    }
+    
     setIsModalOpen(false);
+    setEditingId(null);
     setFormData({
       date: new Date().toISOString().split('T')[0],
       category: '美食',
@@ -193,6 +194,34 @@ const ExpenseView: React.FC<ExpenseViewProps> = ({ members, isEditable, currenci
     } else {
       setFormData({ ...formData, splitWith: [...currentSplit, memberId] });
     }
+  };
+
+  const confirmDeleteExpense = () => {
+    if (expenseToDelete) {
+      setExpenses(prev => prev.filter(e => e.id !== expenseToDelete));
+      setExpenseToDelete(null);
+    }
+  };
+
+  const handleOpenEditModal = (exp: Transaction) => {
+    if (!isEditable) return;
+    setEditingId(exp.id);
+    setFormData({ ...exp });
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setEditingId(null);
+    setFormData({
+      date: new Date().toISOString().split('T')[0],
+      category: '美食',
+      currency: currencies[0] || 'JPY',
+      amount: 0,
+      location: '',
+      payer: members[0]?.id || '',
+      splitWith: members.map(m => m.id),
+    });
   };
 
   return (
@@ -302,7 +331,7 @@ const ExpenseView: React.FC<ExpenseViewProps> = ({ members, isEditable, currenci
         <div className="flex justify-between items-center mb-3 px-2">
           <h2 className="text-lg font-bold">帳務明細</h2>
           <button 
-            onClick={() => setIsModalOpen(true)}
+            onClick={() => { setEditingId(null); setIsModalOpen(true); }}
             className="p-2 bg-slate-900 text-white rounded-full active:scale-95 transition-transform"
           >
             <Plus size={18}/>
@@ -313,7 +342,11 @@ const ExpenseView: React.FC<ExpenseViewProps> = ({ members, isEditable, currenci
             const payer = members.find(m => m.id === exp.payer);
             const catInfo = CATEGORIES.find(c => c.label === exp.category) || CATEGORIES[CATEGORIES.length - 1];
             return (
-              <div key={exp.id} className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
+              <div 
+                key={exp.id} 
+                onClick={() => handleOpenEditModal(exp)}
+                className={`bg-white p-4 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4 transition-all ${isEditable ? 'active:scale-[0.98] cursor-pointer hover:border-blue-200' : ''}`}
+              >
                 <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center text-xl">
                   {catInfo.icon}
                 </div>
@@ -328,13 +361,23 @@ const ExpenseView: React.FC<ExpenseViewProps> = ({ members, isEditable, currenci
                     </div>
                   </div>
                 </div>
-                <div className="text-right shrink-0">
-                  <div className="font-black text-lg text-slate-900">
-                    {getCurrencySymbol(exp.currency)}{exp.amount.toLocaleString()}
+                <div className="flex items-center gap-2 shrink-0">
+                  <div className="text-right">
+                    <div className="font-black text-lg text-slate-900">
+                      {getCurrencySymbol(exp.currency)}{exp.amount.toLocaleString()}
+                    </div>
+                    <div className="text-[10px] text-slate-400 font-bold">
+                      {exp.currency === 'JPY' ? `≈ NT$ ${Math.round(exp.amount * effectiveRate).toLocaleString()}` : (exp.currency === 'TWD' ? `≈ ¥ ${Math.round(exp.amount / effectiveRate).toLocaleString()}` : '')}
+                    </div>
                   </div>
-                  <div className="text-[10px] text-slate-400 font-bold">
-                    {exp.currency === 'JPY' ? `≈ NT$ ${Math.round(exp.amount * effectiveRate).toLocaleString()}` : (exp.currency === 'TWD' ? `≈ ¥ ${Math.round(exp.amount / effectiveRate).toLocaleString()}` : '')}
-                  </div>
+                  {isEditable && (
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); setExpenseToDelete(exp.id); }}
+                      className="p-1.5 text-slate-300 hover:text-red-400 hover:bg-red-50 rounded-lg transition-all active:scale-90"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
                 </div>
               </div>
             );
@@ -347,17 +390,37 @@ const ExpenseView: React.FC<ExpenseViewProps> = ({ members, isEditable, currenci
         </div>
       </section>
 
+      {/* 刪除確認彈窗 */}
+      {expenseToDelete && (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center px-6">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setExpenseToDelete(null)}></div>
+          <div className="relative w-full max-sm bg-white rounded-[2.5rem] shadow-2xl p-8 text-center animate-in zoom-in-95 duration-200">
+            <div className="w-16 h-16 bg-red-50 rounded-3xl flex items-center justify-center text-red-500 mx-auto mb-4">
+              <AlertTriangle size={32} />
+            </div>
+            <h3 className="text-xl font-black text-slate-800 mb-2">確定要刪除嗎？</h3>
+            <p className="text-sm text-slate-500 font-medium mb-8 leading-relaxed">
+              「{expenses.find(e => e.id === expenseToDelete)?.location}」這筆帳目刪除後將無法復原。
+            </p>
+            <div className="flex flex-col gap-3">
+              <button onClick={confirmDeleteExpense} className="w-full py-4 bg-red-500 text-white rounded-2xl font-bold shadow-lg shadow-red-100 active:scale-95 transition-all">確認刪除</button>
+              <button onClick={() => setExpenseToDelete(null)} className="w-full py-4 bg-slate-100 text-slate-500 rounded-2xl font-bold active:scale-95 transition-all">取消</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {isModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-end justify-center px-4 pb-4">
-          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setIsModalOpen(false)}></div>
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={closeModal}></div>
           <div className="relative w-full max-w-lg bg-white rounded-[2.5rem] shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-300">
             <div className="p-6">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-black flex items-center gap-2">
                   <div className="p-2 bg-slate-100 rounded-xl"><Wallet size={20} className="text-slate-600" /></div>
-                  新增支出項目
+                  {editingId ? '修改支出項目' : '新增支出項目'}
                 </h3>
-                <button onClick={() => setIsModalOpen(false)} className="p-2 bg-slate-100 rounded-full text-slate-400"><X size={20} /></button>
+                <button onClick={closeModal} className="p-2 bg-slate-100 rounded-full text-slate-400"><X size={20} /></button>
               </div>
 
               <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1 hide-scrollbar">
@@ -472,13 +535,13 @@ const ExpenseView: React.FC<ExpenseViewProps> = ({ members, isEditable, currenci
               </div>
 
               <div className="mt-8 flex gap-3">
-                <button onClick={() => setIsModalOpen(false)} className="flex-1 py-4 bg-slate-100 rounded-2xl font-bold text-slate-500 active:scale-95 transition-all">取消</button>
+                <button onClick={closeModal} className="flex-1 py-4 bg-slate-100 rounded-2xl font-bold text-slate-500 active:scale-95 transition-all">取消</button>
                 <button 
                   onClick={handleAddExpense} 
                   disabled={!formData.amount || !formData.location || !formData.payer || (formData.splitWith?.length === 0)}
                   className="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-bold shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-30 disabled:grayscale"
                 >
-                  <Check size={18} /> 儲存帳目
+                  <Check size={18} /> {editingId ? '儲存修改' : '儲存帳目'}
                 </button>
               </div>
             </div>

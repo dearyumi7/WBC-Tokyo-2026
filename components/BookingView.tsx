@@ -1,5 +1,5 @@
 import React, { useState } from 'https://esm.sh/react@19.2.3';
-import { Plane, Hotel, Ticket as TicketIcon, Utensils, Plus, Edit2, Clock, MapPin, Info, Train, AlertCircle, Trash2, X, Check, ChevronUp, ChevronDown, Package, Armchair, DollarSign, Trophy, Castle, Camera, Music, Gamepad2, ShoppingCart, ExternalLink, Beef, Soup, Pizza, Coffee, Beer, IceCream, Sandwich } from 'https://esm.sh/lucide-react@0.563.0';
+import { Plane, Hotel, Ticket as TicketIcon, Utensils, Plus, Edit2, Clock, MapPin, Info, Train, AlertCircle, Trash2, X, Check, ChevronUp, ChevronDown, Package, Armchair, DollarSign, Trophy, Castle, Camera, Music, Gamepad2, ShoppingCart, ExternalLink, Beef, Soup, Pizza, Coffee, Beer, IceCream, Sandwich, AlertTriangle } from 'https://esm.sh/lucide-react@0.563.0';
 import { Flight, Transport, Accommodation, Ticket, Restaurant, Member } from '../types';
 
 interface BookingViewProps {
@@ -53,6 +53,7 @@ const BookingView: React.FC<BookingViewProps> = ({
   const [modalType, setModalType] = useState<ModalType>(null);
   const [formData, setFormData] = useState<any>({});
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [itemToDelete, setItemToDelete] = useState<{ type: ModalType, index: number } | null>(null);
   
   const [editModes, setEditModes] = useState<Record<string, boolean>>({
     flight: false,
@@ -96,12 +97,18 @@ const BookingView: React.FC<BookingViewProps> = ({
 
   const deleteItem = (type: ModalType, index: number, e: React.MouseEvent) => {
     e.stopPropagation(); 
-    if (!window.confirm('確定要刪除這筆資料嗎？')) return;
+    setItemToDelete({ type, index });
+  };
+
+  const confirmDelete = () => {
+    if (!itemToDelete) return;
+    const { type, index } = itemToDelete;
     if (type === 'flight') setFlights(flights.filter((_, i) => i !== index));
     if (type === 'transport') setTransports(transports.filter((_, i) => i !== index));
     if (type === 'hotel') setHotels(hotels.filter((_, i) => i !== index));
     if (type === 'ticket') setTickets(tickets.filter((_, i) => i !== index));
     if (type === 'restaurant') setRestaurants(restaurants.filter((_, i) => i !== index));
+    setItemToDelete(null);
   };
 
   const handleOpenModal = (type: ModalType) => {
@@ -232,6 +239,16 @@ const BookingView: React.FC<BookingViewProps> = ({
       </button>
     </div>
   );
+
+  const getItemName = (item: any, type: ModalType) => {
+    if (!item) return '';
+    if (type === 'flight') return `${item.airline} ${item.flightNo}`;
+    if (type === 'transport') return item.name;
+    if (type === 'hotel') return item.name;
+    if (type === 'ticket') return item.event;
+    if (type === 'restaurant') return item.name;
+    return '';
+  };
 
   return (
     <div className="pb-10">
@@ -644,6 +661,34 @@ const BookingView: React.FC<BookingViewProps> = ({
           </div>
         </section>
       </div>
+
+      {/* 刪除確認彈窗 */}
+      {itemToDelete && (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center px-6">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setItemToDelete(null)}></div>
+          <div className="relative w-full max-w-sm bg-white rounded-[2.5rem] shadow-2xl p-8 text-center animate-in zoom-in-95 duration-200">
+            <div className="w-16 h-16 bg-red-50 rounded-3xl flex items-center justify-center text-red-500 mx-auto mb-4">
+              <AlertTriangle size={32} />
+            </div>
+            <h3 className="text-xl font-black text-slate-800 mb-2">確定要刪除嗎？</h3>
+            <p className="text-sm text-slate-500 font-medium mb-8 leading-relaxed">
+              「{(() => {
+                const { type, index } = itemToDelete;
+                if (type === 'flight') return getItemName(flights[index], 'flight');
+                if (type === 'transport') return getItemName(transports[index], 'transport');
+                if (type === 'hotel') return getItemName(hotels[index], 'hotel');
+                if (type === 'ticket') return getItemName(tickets[index], 'ticket');
+                if (type === 'restaurant') return getItemName(restaurants[index], 'restaurant');
+                return '';
+              })()}」預訂資料刪除後將無法復原。
+            </p>
+            <div className="flex flex-col gap-3">
+              <button onClick={confirmDelete} className="w-full py-4 bg-red-500 text-white rounded-2xl font-bold shadow-lg shadow-red-100 active:scale-95 transition-all">確認刪除</button>
+              <button onClick={() => setItemToDelete(null)} className="w-full py-4 bg-slate-100 text-slate-500 rounded-2xl font-bold active:scale-95 transition-all">取消</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Data Entry Modal */}
       {modalType && (

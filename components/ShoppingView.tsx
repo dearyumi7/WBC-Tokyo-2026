@@ -30,10 +30,13 @@ const ShoppingView: React.FC<ShoppingViewProps> = ({ items, setItems, members, i
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
   
-  const [customRate, setCustomRate] = useState<number>(0);
+  const [customRate, setCustomRate] = useState<string>('');
   const [isRateLocked, setIsRateLocked] = useState(false);
 
-  const effectiveRate = (isRateLocked && customRate > 0) ? customRate : EXCHANGE_RATE;
+  const effectiveRate = useMemo(() => {
+    const rateNum = parseFloat(customRate);
+    return (isRateLocked && !isNaN(rateNum) && rateNum > 0) ? rateNum : EXCHANGE_RATE;
+  }, [isRateLocked, customRate]);
 
   const [formData, setFormData] = useState<Partial<ShoppingItem>>({
     name: '',
@@ -219,9 +222,11 @@ const ShoppingView: React.FC<ShoppingViewProps> = ({ items, setItems, members, i
 
   const handleDragStart = (e: React.DragEvent, id: string) => {
     if (!isEditMode) return;
-    setDraggedItemId(id);
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', id);
+    // Use setTimeout to delay setting the ID. This ensures the browser captures
+    // the opaque element for the drag ghost before the dimming style is applied.
+    setTimeout(() => setDraggedItemId(id), 0);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -242,6 +247,10 @@ const ShoppingView: React.FC<ShoppingViewProps> = ({ items, setItems, members, i
       newList.splice(targetIndex, 0, draggedItem);
       return newList;
     });
+    setDraggedItemId(null);
+  };
+
+  const handleDragEnd = () => {
     setDraggedItemId(null);
   };
 
@@ -295,28 +304,30 @@ const ShoppingView: React.FC<ShoppingViewProps> = ({ items, setItems, members, i
                 ))}
               </div>
               
-              <div className="flex items-center gap-1.5 shrink-0">
-                {isEditMode && (
-                  <button 
-                    onClick={handleOpenAddModal}
-                    className="p-1.5 bg-blue-600 text-white rounded-lg shadow-lg shadow-blue-100 active:scale-90 transition-all"
-                  >
-                    <Plus size={16} />
-                  </button>
-                )}
+              {activeSubTab === 'list' && (
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {isEditMode && (
+                    <button 
+                      onClick={handleOpenAddModal}
+                      className="p-1.5 bg-blue-600 text-white rounded-lg shadow-lg shadow-blue-100 active:scale-90 transition-all"
+                    >
+                      <Plus size={16} />
+                    </button>
+                  )}
 
-                <button 
-                  onClick={() => setIsEditMode(!isEditMode)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all active:scale-95 border ${
-                    isEditMode 
-                    ? 'bg-slate-900 border-slate-900 text-white' 
-                    : 'bg-white border-slate-200 text-slate-500'
-                  }`}
-                >
-                  {isEditMode ? <Check size={14} /> : <Edit3 size={14} />}
-                  <span>{isEditMode ? '完成' : '編輯'}</span>
-                </button>
-              </div>
+                  <button 
+                    onClick={() => setIsEditMode(!isEditMode)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all active:scale-95 border ${
+                      isEditMode 
+                      ? 'bg-slate-900 border-slate-900 text-white' 
+                      : 'bg-white border-slate-200 text-slate-500'
+                    }`}
+                  >
+                    {isEditMode ? <Check size={14} /> : <Edit3 size={14} />}
+                    <span>{isEditMode ? '完成' : '編輯'}</span>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -363,6 +374,7 @@ const ShoppingView: React.FC<ShoppingViewProps> = ({ items, setItems, members, i
                       onDragStart={(e) => handleDragStart(e, item.id)}
                       onDragOver={handleDragOver}
                       onDrop={(e) => handleDrop(e, item.id)}
+                      onDragEnd={handleDragEnd}
                       className={`group relative bg-white rounded-[2rem] overflow-hidden shadow-sm border transition-all flex flex-col ${isEditMode ? 'border-blue-400 ring-2 ring-blue-50 cursor-grab active:cursor-grabbing' : 'border-slate-100 active:scale-[0.98]'} ${draggedItemId === item.id ? 'opacity-40 grayscale scale-95 border-dashed border-blue-300' : ''}`}
                     >
                       <div className="relative aspect-square bg-slate-50 overflow-hidden">
@@ -513,10 +525,11 @@ const ShoppingView: React.FC<ShoppingViewProps> = ({ items, setItems, members, i
                         <input 
                           type="number" 
                           step="0.001"
-                          value={customRate || ''}
+                          value={customRate}
                           disabled={isRateLocked}
-                          onChange={(e) => setCustomRate(parseFloat(e.target.value) || 0)}
-                          className={`w-10 bg-transparent text-[10px] font-bold border-none p-0 focus:ring-0 text-right ${isRateLocked ? 'text-slate-400' : 'text-slate-800'}`}
+                          onChange={(e) => setCustomRate(e.target.value)}
+                          className={`w-12 bg-transparent text-[10px] font-bold border-none p-0 focus:ring-0 text-right ${isRateLocked ? 'text-slate-400' : 'text-slate-800'}`}
+                          placeholder={EXCHANGE_RATE.toString()}
                         />
                         <button onClick={() => setIsRateLocked(!isRateLocked)} className={`p-1 rounded-lg transition-all ${isRateLocked ? 'text-blue-600' : 'text-slate-400'}`}>
                           {isRateLocked ? <Lock size={10} /> : <LockOpen size={10} />}
