@@ -818,7 +818,7 @@ const PrepView: React.FC<PrepViewProps> = ({ members, setMembers, tripConfig, se
               <AlertTriangle size={32} />
             </div>
             <h3 className="text-xl font-black text-slate-800 mb-2">確定要刪除成員嗎？</h3>
-            <p className="text-sm text-slate-500 font-medium mb-8導致的 leading-relaxed">
+            <p className="text-sm text-slate-500 font-medium mb-8 leading-relaxed">
               「{members.find(m => m.id === memberToDeleteId)?.name}」刪除後將無法復原。
             </p>
             <div className="flex flex-col gap-3">
