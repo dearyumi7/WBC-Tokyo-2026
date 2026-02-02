@@ -48,9 +48,11 @@ const PrepView: React.FC<PrepViewProps> = ({ members, setMembers, tripConfig, se
   // 優惠券相關狀態
   const [isCouponModalOpen, setIsCouponModalOpen] = useState(false);
   const [previewCoupon, setPreviewCoupon] = useState<CouponItem | null>(null);
+  const [isPreviewZoomed, setIsPreviewZoomed] = useState(false);
   const [editingCoupon, setEditingCoupon] = useState<CouponItem | null>(null);
   const [couponFormData, setCouponFormData] = useState({ title: '', image: '' });
   const [couponToDeleteId, setCouponToDeleteId] = useState<string | null>(null);
+  const [draggedCouponId, setDraggedCouponId] = useState<string | null>(null);
   const couponFileInputRef = useRef<HTMLInputElement>(null);
 
   // 緊急聯絡人狀態 (初始資料)
@@ -81,6 +83,35 @@ const PrepView: React.FC<PrepViewProps> = ({ members, setMembers, tripConfig, se
   const toggleList = (list: ChecklistItem[], setFn: any, id: string) => {
     if (isEditingChecklist) return;
     setFn(list.map(item => item.id === id ? { ...item, checked: !item.checked } : item));
+  };
+
+  // 優惠券拖曳處理
+  const handleCouponDragStart = (e: React.DragEvent, id: string) => {
+    if (!isEditingCoupons) return;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', id);
+    setTimeout(() => setDraggedCouponId(id), 0);
+  };
+
+  const handleCouponDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleCouponDrop = (e: React.DragEvent, targetId: string) => {
+    e.preventDefault();
+    if (!isEditingCoupons || !draggedCouponId || draggedCouponId === targetId) return;
+
+    const newList = [...coupons];
+    const draggedIndex = newList.findIndex(c => c.id === draggedCouponId);
+    const targetIndex = newList.findIndex(c => c.id === targetId);
+    
+    if (draggedIndex !== -1 && targetIndex !== -1) {
+      const [draggedItem] = newList.splice(draggedIndex, 1);
+      newList.splice(targetIndex, 0, draggedItem);
+      setCoupons(newList);
+    }
+    setDraggedCouponId(null);
   };
 
   // 優惠券處理邏輯
@@ -495,25 +526,36 @@ const PrepView: React.FC<PrepViewProps> = ({ members, setMembers, tripConfig, se
             {coupons.map(coupon => (
               <div 
                 key={coupon.id} 
+                draggable={isEditingCoupons}
+                onDragStart={(e) => handleCouponDragStart(e, coupon.id)}
+                onDragOver={handleCouponDragOver}
+                onDrop={(e) => handleCouponDrop(e, coupon.id)}
+                onDragEnd={() => setDraggedCouponId(null)}
                 onClick={() => {
                   if (isEditingCoupons) {
                     handleOpenCouponModal(coupon);
                   } else {
                     setPreviewCoupon(coupon);
+                    setIsPreviewZoomed(false);
                   }
                 }}
-                className="bg-white rounded-[2rem] overflow-hidden border border-slate-100 shadow-sm transition-all active:scale-[0.98] cursor-pointer group hover:border-blue-400 relative"
+                className={`bg-white rounded-[2rem] overflow-hidden border border-slate-100 shadow-sm transition-all active:scale-[0.98] cursor-pointer group hover:border-blue-400 relative ${draggedCouponId === coupon.id ? 'opacity-40 grayscale scale-95 border-dashed border-blue-300' : ''}`}
               >
                 <div className="aspect-square bg-slate-50 relative overflow-hidden">
                   <img src={coupon.image} className="w-full h-full object-cover" alt={coupon.title} />
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
                   {isEditingCoupons && (
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); setCouponToDeleteId(coupon.id); }}
-                      className="absolute top-2 right-2 p-2 bg-red-50 text-red-500 rounded-full active:scale-90 transition-transform shadow-sm z-20"
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    <>
+                      <div className="absolute top-2 left-2 p-1.5 bg-white/90 backdrop-blur-md text-slate-300 rounded-lg shadow-sm">
+                        <GripVertical size={14} />
+                      </div>
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); setCouponToDeleteId(coupon.id); }}
+                        className="absolute top-2 right-2 p-2 bg-red-50 text-red-500 rounded-full active:scale-90 transition-transform shadow-sm z-20"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </>
                   )}
                 </div>
                 <div className="p-3">
@@ -591,17 +633,45 @@ const PrepView: React.FC<PrepViewProps> = ({ members, setMembers, tripConfig, se
       {/* 圖片預覽 Overlay */}
       {previewCoupon && (
         <div 
-          className="fixed inset-0 z-[300] bg-slate-900/95 backdrop-blur-xl flex flex-col items-center justify-center p-6 animate-in fade-in duration-300"
-          onClick={() => setPreviewCoupon(null)}
+          className="fixed inset-0 z-[300] bg-slate-900/98 backdrop-blur-2xl flex flex-col items-center justify-center animate-in fade-in duration-300 overflow-hidden"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+               setPreviewCoupon(null);
+               setIsPreviewZoomed(false);
+            }
+          }}
         >
-          <button className="absolute top-12 right-6 p-3 bg-white/10 text-white rounded-full backdrop-blur-md">
+          <button 
+            onClick={() => { setPreviewCoupon(null); setIsPreviewZoomed(false); }}
+            className="absolute top-10 right-6 z-[310] p-3 bg-white/10 text-white rounded-full backdrop-blur-md active:scale-90 transition-all"
+          >
             <X size={24} />
           </button>
-          <div className="w-full max-w-lg aspect-[4/5] bg-white rounded-[2rem] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300">
-            <img src={previewCoupon.image} className="w-full h-full object-contain bg-slate-50" alt={previewCoupon.title} />
+          
+          <div 
+            className={`w-full h-full flex items-center justify-center p-4 transition-all duration-500 ease-out cursor-zoom-in ${isPreviewZoomed ? 'overflow-auto' : ''}`}
+            onClick={() => setIsPreviewZoomed(!isPreviewZoomed)}
+          >
+            <img 
+              src={previewCoupon.image} 
+              className={`transition-all duration-500 ease-in-out shadow-2xl bg-white ${
+                isPreviewZoomed 
+                  ? 'min-w-[150%] h-auto rounded-none border-[12px] border-white' 
+                  : 'max-w-full max-h-[85vh] rounded-3xl object-contain border-4 border-white/20'
+              }`} 
+              alt={previewCoupon.title} 
+            />
           </div>
-          <p className="mt-6 text-white font-black text-xl tracking-tight">{previewCoupon.title}</p>
-          <p className="mt-2 text-white/50 text-xs font-bold uppercase tracking-widest">點擊背景關閉</p>
+
+          {!isPreviewZoomed && (
+            <div className="absolute bottom-10 left-0 right-0 flex flex-col items-center pointer-events-none px-6 text-center">
+              <p className="text-white font-black text-xl tracking-tight mb-2 drop-shadow-lg">{previewCoupon.title}</p>
+              <div className="flex gap-4">
+                 <p className="text-white/60 text-[10px] font-bold uppercase tracking-widest">點擊圖片縮放</p>
+                 <p className="text-white/60 text-[10px] font-bold uppercase tracking-widest">點擊背景關閉</p>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
