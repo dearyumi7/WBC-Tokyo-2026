@@ -1,29 +1,10 @@
-
 import React, { useState, useEffect, useRef, useMemo } from 'https://esm.sh/react@19.2.3';
-import { MapPin, Navigation, Plus, Sun, Cloud, Clock, Wind, Edit3, Check, X, Info, Trash2, Train, Bus, Car, Plane, Footprints, ChevronRight, ArrowRight, ChevronDown, ChevronUp, StickyNote, DollarSign, GripVertical, History, Utensils, ShoppingBag, Map as MapIcon, Loader2, ArrowLeft, BookOpen, Settings, ListPlus, Bold, Italic, Type, Palette, Minus, ExternalLink, Link, Image, Search, AlertTriangle } from 'https://esm.sh/lucide-react@0.563.0';
-import { Transport, TransportTransfer } from '../types.ts';
+// Add Calendar as CalendarIcon to the imports from lucide-react
+import { MapPin, Navigation, Plus, Sun, Cloud, Clock, Wind, Edit3, Check, X, Info, Trash2, Train, Bus, Car, Plane, Footprints, ChevronRight, ArrowRight, ChevronDown, ChevronUp, StickyNote, DollarSign, GripVertical, History, Utensils, ShoppingBag, Map as MapIcon, Loader2, ArrowLeft, BookOpen, Settings, ListPlus, Bold, Italic, Type, Palette, Minus, ExternalLink, Link, Image, Search, AlertTriangle, Calendar as CalendarIcon } from 'https://esm.sh/lucide-react@0.563.0';
+import { Transport, TransportTransfer, ScheduleItem, CustomDetail } from '../types.ts';
 
 import { db } from '../firebase.ts';
 import { doc, updateDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js';
-
-interface CustomDetail {
-  id: string; // 新增唯一 ID 確保排序時組件能正確對應
-  title: string;
-  content: string; // 儲存 HTML 字串
-}
-
-interface ScheduleItem {
-  id: string;
-  time: string;
-  event: string;
-  addr: string;
-  type: string;
-  plannedTransport?: Partial<Transport> | null;
-  customNote?: string | null;
-  price?: number;
-  currency?: 'JPY' | 'TWD' | string;
-  customDetails?: CustomDetail[];
-}
 
 interface RichTextEditorProps {
   initialValue: string;
@@ -37,7 +18,6 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ initialValue, onChange 
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
   const [locationValue, setLocationValue] = useState('');
 
-  // 初始化與同步內容
   useEffect(() => {
     if (editorRef.current && editorRef.current.innerHTML !== initialValue) {
       editorRef.current.innerHTML = initialValue;
@@ -116,7 +96,6 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ initialValue, onChange 
 
   return (
     <div className="border border-slate-200 rounded-3xl overflow-hidden bg-white shadow-sm ring-1 ring-slate-100">
-      {/* Hidden File Input */}
       <input 
         type="file" 
         ref={fileInputRef} 
@@ -125,7 +104,6 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ initialValue, onChange 
         className="hidden" 
       />
 
-      {/* Location Search Modal (Scoped to Editor) */}
       {isLocationModalOpen && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center px-6">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsLocationModalOpen(false)}></div>
@@ -165,7 +143,6 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ initialValue, onChange 
         </div>
       )}
 
-      {/* Toolbar */}
       <div className="flex flex-wrap gap-1 p-2 bg-slate-50/80 backdrop-blur-sm border-b border-slate-100">
         <button type="button" onMouseDown={preventFocusLoss} onClick={() => execCommand('bold')} className="p-2 hover:bg-white rounded-xl transition-all text-slate-600 active:scale-90" title="粗體"><Bold size={16} /></button>
         <button type="button" onMouseDown={preventFocusLoss} onClick={() => execCommand('italic')} className="p-2 hover:bg-white rounded-xl transition-all text-slate-600 active:scale-90" title="斜體"><Italic size={16} /></button>
@@ -189,7 +166,6 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ initialValue, onChange 
         <button type="button" onMouseDown={preventFocusLoss} onClick={() => execCommand('insertHorizontalRule')} className="p-2 hover:bg-white rounded-xl transition-all text-slate-400 active:scale-90" title="插入分隔線"><Minus size={16} /></button>
       </div>
 
-      {/* Editor Content */}
       <div
         ref={editorRef}
         contentEditable
@@ -208,9 +184,11 @@ interface ItineraryViewProps {
   transports?: Transport[];
   startDate: string;
   endDate: string;
+  scheduleItems: ScheduleItem[];
+  setScheduleItems: React.Dispatch<React.SetStateAction<ScheduleItem[]>>;
 }
 
-const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDate, endDate }) => {
+const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDate, endDate, scheduleItems, setScheduleItems }) => {
   const [selectedDay, setSelectedDay] = useState(0);
   const [isEditMode, setIsEditMode] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -218,7 +196,6 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
   const [isTransportModalOpen, setIsTransportModalOpen] = useState(false);
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   
-  // 新增：處理刪除確認狀態
   const [itemToDeleteId, setItemToDeleteId] = useState<string | null>(null);
   const [isTransportDeleteConfirmOpen, setIsTransportDeleteConfirmOpen] = useState(false);
 
@@ -231,46 +208,36 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
   const [activeTransportItem, setActiveTransportItem] = useState<ScheduleItem | null>(null);
   const [activeNoteItem, setActiveNoteItem] = useState<ScheduleItem | null>(null);
 
-
-// --- 貼在第 229 行 ---
-  React.useEffect(() => {
-    // 確保資料庫有連上
-    if (!db) return;
-    const tripRef = doc(db, 'trips', 'main_trip_data');
-    // 開始監聽雲端，只要雲端有變動，畫面就自動更新
-    const unsubscribe = onSnapshot(tripRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        if (data.scheduleItems) {
-          setScheduleItems(data.scheduleItems);
-          console.log("📡 雲端最新行程已送達！");
-        }
-      }
-    });
-    return () => unsubscribe();
-  }, []);
-
-
-  // 計算行程日期標籤
+  // Generate date labels based on trip config
   const days = useMemo(() => {
     const start = new Date(startDate);
     const end = new Date(endDate);
     const result = [];
     const weekdays = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
     
-    // Safety check for invalid dates
-    if (isNaN(start.getTime()) || isNaN(end.getTime())) return [{ date: '3/5', weekday: 'THU', weather: '12°C', icon: Sun, condition: '晴朗' }];
+    // 定義一組天氣模擬數據，使每個日期頁面都有獨立的天氣資訊
+    const weatherData = [
+      { temp: '12°C', icon: Sun, condition: '晴朗' },
+      { temp: '14°C', icon: Sun, condition: '晴朗' },
+      { temp: '10°C', icon: Cloud, condition: '多雲' },
+      { temp: '11°C', icon: Sun, condition: '晴時多雲' },
+      { temp: '9°C', icon: Cloud, condition: '陰天' },
+      { temp: '13°C', icon: Sun, condition: '晴朗' },
+    ];
+
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) return [];
 
     let current = new Date(start);
-    // Limit to prevent accidental infinite loop if dates are weird
     let count = 0;
     while (current <= end && count < 31) {
+      const w = weatherData[count % weatherData.length];
       result.push({
         date: `${current.getMonth() + 1}/${current.getDate()}`,
+        fullDate: current.toISOString().split('T')[0], // Store ISO date for filtering
         weekday: weekdays[current.getDay()],
-        weather: '12°C', // Placeholder
-        icon: Sun,      // Placeholder
-        condition: '晴朗' // Placeholder
+        weather: w.temp,
+        icon: w.icon,
+        condition: w.condition
       });
       current.setDate(current.getDate() + 1);
       count++;
@@ -278,26 +245,15 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
     return result;
   }, [startDate, endDate]);
 
-  const [scheduleItems, setScheduleItems] = useState<ScheduleItem[]>([
-    { 
-      id: '1', 
-      time: '05:35', 
-      event: '抵達桃園機場第二航廈', 
-      addr: 'Taoyuan International Airport T2', 
-      type: 'transport',
-      plannedTransport: {
-        type: '計程車',
-        name: '機場接送',
-        from: '住家',
-        to: '桃園機場',
-        departureTime: '05:00',
-        arrivalTime: '05:35',
-        note: ''
-      }
-    }
-  ]);
+  const currentDayInfo = days[selectedDay];
+  
+  // Filter items for the selected date to make each date tab look independent
+  const filteredScheduleItems = useMemo(() => {
+    if (!currentDayInfo) return [];
+    return scheduleItems.filter(item => item.date === currentDayInfo.fullDate);
+  }, [scheduleItems, currentDayInfo]);
 
-  const [activeItemId, setActiveItemId] = useState<string | null>(scheduleItems[0]?.id || null);
+  const [activeItemId, setActiveItemId] = useState<string | null>(filteredScheduleItems[0]?.id || null);
   const visibilityMap = useRef<Map<string, number>>(new Map());
   
   const [expandedTransports, setExpandedTransports] = useState<Record<string, boolean>>(() => {
@@ -318,7 +274,6 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
     }
   });
 
-  // 設定滾動監測
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
@@ -367,7 +322,7 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
     elements.forEach((el) => observer.observe(el));
 
     return () => observer.disconnect();
-  }, [scheduleItems, isEditMode, expandedTransports, expandedNotes]);
+  }, [filteredScheduleItems, isEditMode, expandedTransports, expandedNotes]);
 
   const getTransportIcon = (type: string = '') => {
     switch (type) {
@@ -447,39 +402,38 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
   };
 
   const handleSave = () => {
-    if (!formData.event || !formData.time) return;
+    if (!formData.event || !formData.time || !currentDayInfo) return;
+    
+    // Inject the selected date when saving an item
+    const itemData = { 
+      ...formData, 
+      date: currentDayInfo.fullDate 
+    } as ScheduleItem;
+
     let newList = editingItem 
-      ? scheduleItems.map(item => item.id === editingItem.id ? { ...item, ...formData } : item)
-      : [...scheduleItems, { ...formData, id: Date.now().toString() }];
+      ? scheduleItems.map(item => item.id === editingItem.id ? { ...item, ...itemData } : item)
+      : [...scheduleItems, { ...itemData, id: Date.now().toString() }];
 
     setScheduleItems(newList);
     setIsModalOpen(false);
 
-    // 強迫寫入 Firebase
     const tripRef = doc(db, 'trips', 'main_trip_data');
-    updateDoc(tripRef, { scheduleItems: newList })
-      .then(() => console.log("✅ 真正存入資料庫了"))
-      .catch(e => alert("存入失敗：" + e.message));
+    updateDoc(tripRef, { scheduleItems: newList });
   };
 
-  // 修正：刪除按鈕改為開啟確認彈窗
   const handleDelete = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     setItemToDeleteId(id);
   };
 
-  // 新增：真正執行刪除並同步雲端
   const confirmDelete = () => {
     if (!itemToDeleteId) return;
     const newList = scheduleItems.filter(item => item.id !== itemToDeleteId);
     setScheduleItems(newList);
     setItemToDeleteId(null);
 
-    // 同步雲端以防止 onSnapshot 覆寫回本地
     const tripRef = doc(db, 'trips', 'main_trip_data');
-    updateDoc(tripRef, { scheduleItems: newList })
-      .then(() => console.log("✅ 行程已從雲端移除"))
-      .catch(e => console.error("雲端刪除失敗：", e));
+    updateDoc(tripRef, { scheduleItems: newList });
   };
 
   const openTransportModal = (item: ScheduleItem, e: React.MouseEvent) => {
@@ -524,7 +478,6 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
 
     setExpandedTransports(prev => {
       const newState = { ...prev, [id]: nextState };
-      // Fix: Use newState to correctly persist the expanded states in localStorage.
       localStorage.setItem('itinerary_expanded_states', JSON.stringify(newState));
       return newState;
     });
@@ -570,7 +523,6 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
     setScheduleItems(newList);
     setIsTransportModalOpen(false);
     
-    // 同步雲端
     const tripRef = doc(db, 'trips', 'main_trip_data');
     updateDoc(tripRef, { scheduleItems: newList });
   };
@@ -585,7 +537,6 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
     setScheduleItems(newList);
     setIsNoteModalOpen(false);
 
-    // 同步雲端
     const tripRef = doc(db, 'trips', 'main_trip_data');
     updateDoc(tripRef, { scheduleItems: newList });
   };
@@ -625,34 +576,21 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
     }));
   };
 
-  // --- Fix missing handlers ---
-  /**
-   * Updates a specific field of a transport transfer at a given index.
-   */
   const handleUpdateTransfer = (index: number, field: keyof TransportTransfer, value: string) => {
     const updated = [...(transportFormData.transfers || [])];
     updated[index] = { ...updated[index], [field]: value };
     setTransportFormData(prev => ({ ...prev, transfers: updated }));
   };
 
-  /**
-   * Initiates the drag operation for a schedule item.
-   */
   const handleDragStart = (e: React.DragEvent, id: string) => {
     setDraggedItemId(id);
     e.dataTransfer.effectAllowed = 'move';
   };
 
-  /**
-   * Prevents the default behavior to allow a drop operation.
-   */
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
   };
 
-  /**
-   * Handles the drop operation to reorder schedule items and sync with cloud.
-   */
   const handleDrop = (e: React.DragEvent, targetId: string) => {
     e.preventDefault();
     if (!draggedItemId || draggedItemId === targetId) return;
@@ -672,17 +610,11 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
     setDraggedItemId(null);
   };
 
-  /**
-   * Initiates the drag operation for a detail section inside the modal.
-   */
   const handleDetailDragStart = (e: React.DragEvent, id: string) => {
     setDraggedDetailId(id);
     e.dataTransfer.effectAllowed = 'move';
   };
 
-  /**
-   * Handles the drop operation to reorder detail sections inside the modal.
-   */
   const handleDetailDrop = (e: React.DragEvent, targetId: string) => {
     e.preventDefault();
     if (!draggedDetailId || draggedDetailId === targetId || !formData.customDetails) return;
@@ -699,9 +631,6 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
     setDraggedDetailId(null);
   };
 
-  /**
-   * Removes a custom detail section by its index.
-   */
   const handleRemoveDetailSection = (index: number) => {
     setFormData(prev => ({
       ...prev,
@@ -717,6 +646,8 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
       return pt.type === t.type && pt.name === t.name && pt.from === t.from && pt.to === t.to && pt.departureTime === t.departureTime && pt.arrivalTime === t.arrivalTime;
     });
   });
+
+  if (!currentDayInfo) return null;
 
   return (
     <div className="space-y-6 pt-4 pb-12">
@@ -740,14 +671,14 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
       <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-500">
-            <currentDayWeather.icon size={28} />
+            {React.createElement(currentDayWeather.icon, { size: 28 })}
           </div>
           <div>
             <div className="flex items-center gap-2">
               <span className="text-2xl font-black text-slate-800">{currentDayWeather.weather}</span>
               <span className="text-sm font-bold text-slate-500">{currentDayWeather.condition}</span>
             </div>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">旅遊地區天氣預報</p>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">今日天氣預報 ({currentDayInfo.date})</p>
           </div>
         </div>
         <div className="flex flex-col items-end text-right">
@@ -784,7 +715,7 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
         </div>
 
         <div className="relative pl-4 space-y-6 before:absolute before:left-6 before:top-2 before:bottom-2 before:w-[1px] before:bg-slate-200">
-          {scheduleItems.map((item, idx) => {
+          {filteredScheduleItems.map((item) => {
             const transportActive = !!item.plannedTransport;
             const transportExpanded = isTransportExpanded(item.id, item);
             const noteActive = !!item.customNote;
@@ -807,7 +738,7 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
                   }`}></div>
                   <div 
                     onClick={() => isEditMode ? handleEditItem(item) : handleOpenSpotDetail(item)}
-                    className={`flex-1 bg-white p-4 rounded-3xl shadow-sm border border-slate-100 transition-all relative ${isEditMode ? 'border-blue-400 ring-2 ring-blue-50 cursor-grab active:cursor-grabbing pr-12' : (hasDetails ? 'hover:border-blue-400 hover:shadow-md cursor-pointer' : '')}`}
+                    className={`flex-1 bg-white p-4 rounded-3xl shadow-sm border border-slate-100 transition-all relative ${isEditMode ? 'border-blue-400 ring-2 ring-blue-50' : (hasDetails ? 'hover:border-blue-400 hover:shadow-md cursor-pointer' : '')}`}
                   >
                     {isEditMode && (
                       <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-3 text-slate-300">
@@ -994,10 +925,23 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
               </div>
             );
           })}
+          {filteredScheduleItems.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-20 text-slate-300 border-2 border-dashed border-slate-50 rounded-[3rem]">
+              <CalendarIcon size={48} strokeWidth={1} className="mb-4 opacity-20" />
+              <p className="text-sm font-bold">此日期尚無行程</p>
+              {isEditMode && (
+                <button 
+                  onClick={handleOpenAddModal}
+                  className="mt-4 flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-full text-xs font-black shadow-lg shadow-blue-100"
+                >
+                  <Plus size={16} /> 新增行程
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* 刪除確認自定義彈窗 (行程項目) */}
       {itemToDeleteId && (
         <div className="fixed inset-0 z-[250] flex items-center justify-center px-6">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setItemToDeleteId(null)}></div>
@@ -1017,7 +961,6 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
         </div>
       )}
 
-      {/* 刪除確認自定義彈窗 (交通規劃) */}
       {isTransportDeleteConfirmOpen && (
         <div className="fixed inset-0 z-[260] flex items-center justify-center px-6">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsTransportDeleteConfirmOpen(false)}></div>
@@ -1038,7 +981,6 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
                     setTransportFormData({ price: 0, currency: 'JPY', transfers: [] });
                     setIsTransportDeleteConfirmOpen(false);
                     setIsTransportModalOpen(false);
-                    // 同步雲端
                     const tripRef = doc(db, 'trips', 'main_trip_data');
                     updateDoc(tripRef, { scheduleItems: newList });
                   }
@@ -1456,7 +1398,6 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
                         const newList = scheduleItems.map(item => item.id === activeNoteItem?.id ? { ...item, customNote: null } : item);
                         setScheduleItems(newList);
                         setIsNoteModalOpen(false);
-                        // 同步雲端
                         const tripRef = doc(db, 'trips', 'main_trip_data');
                         updateDoc(tripRef, { scheduleItems: newList });
                       }

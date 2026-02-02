@@ -100,12 +100,13 @@ export interface CustomDetail {
 
 export interface ScheduleItem {
   id: string;
+  date: string; // New field to support independent date pages
   time: string;
   event: string;
   addr: string;
   type: string;
-  plannedTransport?: Partial<Transport>;
-  customNote?: string;
+  plannedTransport?: Partial<Transport> | null;
+  customNote?: string | null;
   price?: number;
   currency?: 'JPY' | 'TWD' | string;
   customDetails?: CustomDetail[];
