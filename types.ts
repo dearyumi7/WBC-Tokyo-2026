@@ -64,6 +64,7 @@ export interface Accommodation {
   dates: string;
   price: number;
   image: string;
+  note?: string;
 }
 
 export interface Ticket {
@@ -147,7 +148,8 @@ export interface ChecklistItem {
   checked: boolean;
 }
 
-export interface NoteItem {
+export interface CouponItem {
   id: string;
-  content: string;
+  title: string;
+  image: string;
 }

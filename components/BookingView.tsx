@@ -1,4 +1,4 @@
-import React, { useState } from 'https://esm.sh/react@19.2.3';
+import React, { useState, useRef } from 'https://esm.sh/react@19.2.3';
 import { Plane, Hotel, Ticket as TicketIcon, Utensils, Plus, Edit2, Clock, MapPin, Info, Train, AlertCircle, Trash2, X, Check, ChevronUp, ChevronDown, Package, Armchair, DollarSign, Trophy, Castle, Camera, Music, Gamepad2, ShoppingCart, ExternalLink, Beef, Soup, Pizza, Coffee, Beer, IceCream, Sandwich, AlertTriangle } from 'https://esm.sh/lucide-react@0.563.0';
 import { Flight, Transport, Accommodation, Ticket, Restaurant, Member } from '../types';
 
@@ -54,6 +54,7 @@ const BookingView: React.FC<BookingViewProps> = ({
   const [formData, setFormData] = useState<any>({});
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [itemToDelete, setItemToDelete] = useState<{ type: ModalType, index: number } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [editModes, setEditModes] = useState<Record<string, boolean>>({
     flight: false,
@@ -117,7 +118,7 @@ const BookingView: React.FC<BookingViewProps> = ({
     const defaults: any = {
       flight: { airline: '', flightNo: '', from: '', to: '', departure: '', arrival: '', date: '2026/03/05', duration: '', baggage: '23kg x 1', seat: '', memberSeats: {}, note: '' },
       transport: { type: '新幹線', name: '', date: '2026/03/06', from: '', to: '', departureTime: '', arrivalTime: '', duration: '', seatInfo: '', memberSeats: {}, note: '請將行李置於座位後方', price: 0, currency: 'JPY' },
-      hotel: { name: '', address: '', checkIn: '2026/03/05', checkOut: '2026/03/10', price: 0 },
+      hotel: { name: '', address: '', checkIn: '2026/03/05', checkOut: '2026/03/10', price: 0, note: '', image: '' },
       ticket: { category: '球賽票券', event: '', date: '2026/03/08', time: '18:00', teams: '', notes: '', location: '', section: '', row: '', seat: '', iconType: 'ticket' },
       restaurant: { name: '', date: '2026/03/06', time: '12:00', address: '', reservedDishes: '', note: '', iconType: 'general' }
     };
@@ -135,6 +136,17 @@ const BookingView: React.FC<BookingViewProps> = ({
     else if (type === 'restaurant') itemData = restaurants[index];
     
     setFormData({ ...itemData });
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData(prev => ({ ...prev, image: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleSave = () => {
@@ -163,6 +175,7 @@ const BookingView: React.FC<BookingViewProps> = ({
         newList[editingIndex] = processedData;
         setTransports(newList);
       } else if (modalType === 'hotel') {
+        processedData.dates = `${processedData.checkIn} - ${processedData.checkOut}`;
         const newList = [...hotels];
         newList[editingIndex] = processedData;
         setHotels(newList);
@@ -464,7 +477,7 @@ const BookingView: React.FC<BookingViewProps> = ({
                       <ExternalLink size={10} className="opacity-0 group-hover:opacity-100 transition-opacity" />
                     </a>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 gap-3 mb-3">
                     <div className="bg-white p-2.5 rounded-xl border border-slate-100">
                       <div className="text-[9px] uppercase font-bold text-slate-400">Check-in</div>
                       <div className="text-xs font-bold">{h.checkIn}</div>
@@ -474,6 +487,12 @@ const BookingView: React.FC<BookingViewProps> = ({
                       <div className="text-xs font-bold">{h.checkOut}</div>
                     </div>
                   </div>
+                  {h.note && (
+                    <div className="bg-blue-50/50 p-3 rounded-2xl border border-blue-100/30 flex gap-2">
+                      <Info size={12} className="shrink-0 mt-0.5 text-blue-400" />
+                      <p className="text-[10px] text-blue-700 font-semibold whitespace-pre-wrap">{h.note}</p>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
@@ -880,8 +899,30 @@ const BookingView: React.FC<BookingViewProps> = ({
                 {modalType === 'hotel' && (
                   <>
                     <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">飯店照片</label>
+                      <div 
+                        onClick={() => fileInputRef.current?.click()} 
+                        className="w-full aspect-video bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl flex flex-col items-center justify-center cursor-pointer hover:bg-slate-100 transition-colors relative overflow-hidden"
+                      >
+                        {formData.image ? (
+                          <>
+                            <img src={formData.image} className="w-full h-full object-cover" alt="Hotel preview" />
+                            <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                              <Camera className="text-white" size={32} />
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <Camera className="text-slate-200 mb-2" size={32} />
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">點擊上傳飯店照片</span>
+                          </>
+                        )}
+                        <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/*" className="hidden" />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">飯店名稱</label>
-                      <input placeholder="例如：Comfort Hotel Nagoya Meiekiminami" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500" />
+                      <input placeholder="例如：Comfort Hotel Nagoya Meiekiminami" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 font-bold" />
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">地址</label>
@@ -890,12 +931,21 @@ const BookingView: React.FC<BookingViewProps> = ({
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Check-in 日期</label>
-                        <input placeholder="2026/03/05" value={formData.checkIn} onChange={e => setFormData({...formData, checkIn: e.target.value})} className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500" />
+                        <input placeholder="2026/03/05" value={formData.checkIn} onChange={e => setFormData({...formData, checkIn: e.target.value})} className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 font-bold" />
                       </div>
                       <div className="space-y-1">
                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Check-out 日期</label>
-                        <input placeholder="2026/03/10" value={formData.checkOut} onChange={e => setFormData({...formData, checkOut: e.target.value})} className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500" />
+                        <input placeholder="2026/03/10" value={formData.checkOut} onChange={e => setFormData({...formData, checkOut: e.target.value})} className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 font-bold" />
                       </div>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">備註 / 注意事項</label>
+                      <textarea 
+                        placeholder="例如：需現場支付住宿稅、下午三點後進房..." 
+                        value={formData.note} 
+                        onChange={e => setFormData({...formData, note: e.target.value})} 
+                        className="w-full h-24 bg-slate-50 border-none rounded-2xl p-4 text-sm font-medium focus:ring-2 focus:ring-blue-500 resize-none" 
+                      />
                     </div>
                   </>
                 )}

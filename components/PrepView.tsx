@@ -1,9 +1,8 @@
-import React, { useState } from 'https://esm.sh/react@19.2.3';
-import { ClipboardList, Briefcase, Phone, MessageSquare, Plus, CheckCircle2, Circle, ExternalLink, ShieldAlert, Users, Trash2, UserPlus, Info, Check, StickyNote, AlertTriangle, X, Palette, GripVertical, Settings, Globe, Calendar as CalendarIcon, Wallet, ShieldCheck, Edit3, PhoneCall } from 'https://esm.sh/lucide-react@0.563.0';
-import { Member, TripConfig, ChecklistItem, NoteItem } from '../types.ts';
+import React, { useState, useRef } from 'https://esm.sh/react@19.2.3';
+import { ClipboardList, Briefcase, Phone, MessageSquare, Plus, CheckCircle2, Circle, ExternalLink, ShieldAlert, Users, Trash2, UserPlus, Info, Check, StickyNote, AlertTriangle, X, Palette, GripVertical, Settings, Globe, Calendar as CalendarIcon, Wallet, ShieldCheck, Edit3, PhoneCall, Camera, Ticket as CouponIcon, Image as ImageIcon } from 'https://esm.sh/lucide-react@0.563.0';
+import { Member, TripConfig, ChecklistItem, CouponItem } from '../types.ts';
 
-// Fix: Define PrepTab type to resolve "Cannot find name 'PrepTab'" errors
-type PrepTab = 'checklist' | 'emergency' | 'notes' | 'members' | 'settings';
+type PrepTab = 'checklist' | 'emergency' | 'coupons' | 'members' | 'settings';
 
 interface EmergencyContact {
   id: string;
@@ -20,8 +19,8 @@ interface PrepViewProps {
   setTodo: React.Dispatch<React.SetStateAction<ChecklistItem[]>>;
   packing: ChecklistItem[];
   setPacking: React.Dispatch<React.SetStateAction<ChecklistItem[]>>;
-  notes: NoteItem[];
-  setNotes: React.Dispatch<React.SetStateAction<NoteItem[]>>;
+  coupons: CouponItem[];
+  setCoupons: React.Dispatch<React.SetStateAction<CouponItem[]>>;
 }
 
 const MEMBER_COLORS = [
@@ -39,14 +38,21 @@ const CURRENCY_OPTIONS = [
   { code: 'KRW', symbol: '₩', label: '韓元' },
 ];
 
-const PrepView: React.FC<PrepViewProps> = ({ members, setMembers, tripConfig, setTripConfig, todo, setTodo, packing, setPacking, notes, setNotes }) => {
+const PrepView: React.FC<PrepViewProps> = ({ members, setMembers, tripConfig, setTripConfig, todo, setTodo, packing, setPacking, coupons, setCoupons }) => {
   const [activePrepTab, setActivePrepTab] = useState<PrepTab>('checklist');
   const [isEditingMembers, setIsEditingMembers] = useState(false);
   const [isEditingChecklist, setIsEditingChecklist] = useState(false);
+  const [isEditingCoupons, setIsEditingCoupons] = useState(false);
   const [editingMember, setEditingMember] = useState<Member | null>(null);
-  const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
-  const [newNote, setNewNote] = useState('');
   
+  // 優惠券相關狀態
+  const [isCouponModalOpen, setIsCouponModalOpen] = useState(false);
+  const [previewCoupon, setPreviewCoupon] = useState<CouponItem | null>(null);
+  const [editingCoupon, setEditingCoupon] = useState<CouponItem | null>(null);
+  const [couponFormData, setCouponFormData] = useState({ title: '', image: '' });
+  const [couponToDeleteId, setCouponToDeleteId] = useState<string | null>(null);
+  const couponFileInputRef = useRef<HTMLInputElement>(null);
+
   // 緊急聯絡人狀態 (初始資料)
   const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContact[]>([
     { id: '1', name: '警察局', number: '110' },
@@ -72,52 +78,50 @@ const PrepView: React.FC<PrepViewProps> = ({ members, setMembers, tripConfig, se
   const [selectedColor, setSelectedColor] = useState(MEMBER_COLORS[0]);
   const [memberToDeleteId, setMemberToDeleteId] = useState<string | null>(null);
 
-  // 筆記編輯彈窗相關狀態
-  const [isEditNoteModalOpen, setIsEditNoteModalOpen] = useState(false);
-  const [editingNoteItem, setEditingNoteItem] = useState<NoteItem | null>(null);
-  const [editNoteContent, setEditNoteContent] = useState('');
-  const [noteToDeleteId, setNoteToDeleteId] = useState<string | null>(null);
-
   const toggleList = (list: ChecklistItem[], setFn: any, id: string) => {
     if (isEditingChecklist) return;
     setFn(list.map(item => item.id === id ? { ...item, checked: !item.checked } : item));
   };
 
-  const addItem = (setFn: any) => {
-    const text = window.prompt('請輸入項目內容：');
-    if (text) setFn((prev: any) => [...prev, { id: Date.now().toString(), text, checked: false }]);
+  // 優惠券處理邏輯
+  const handleOpenCouponModal = (coupon?: CouponItem) => {
+    if (coupon) {
+      setEditingCoupon(coupon);
+      setCouponFormData({ title: coupon.title, image: coupon.image });
+    } else {
+      setEditingCoupon(null);
+      setCouponFormData({ title: '', image: '' });
+    }
+    setIsCouponModalOpen(true);
   };
 
-  const addNote = () => {
-    if (!newNote.trim()) return;
-    setNotes([...notes, { id: Date.now().toString(), content: newNote }]);
-    setNewNote('');
-  };
-
-  const handleStartEditNote = (note: NoteItem) => {
-    setEditingNoteItem(note);
-    setEditNoteContent(note.content);
-    setIsEditNoteModalOpen(true);
-  };
-
-  const handleSaveEditedNote = () => {
-    if (editingNoteItem && editNoteContent.trim()) {
-      setNotes(notes.map(n => n.id === editingNoteItem.id ? { ...n, content: editNoteContent.trim() } : n));
-      setIsEditNoteModalOpen(false);
-      setEditingNoteItem(null);
+  const handleCouponImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setCouponFormData(prev => ({ ...prev, image: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
     }
   };
 
-  const handleDeleteNote = (id: string) => {
-    setNoteToDeleteId(id);
+  const handleSaveCoupon = () => {
+    if (!couponFormData.title || !couponFormData.image) return;
+
+    if (editingCoupon) {
+      setCoupons(coupons.map(c => c.id === editingCoupon.id ? { ...c, ...couponFormData } : c));
+    } else {
+      setCoupons([{ id: Date.now().toString(), ...couponFormData }, ...coupons]);
+    }
+    setIsCouponModalOpen(false);
   };
 
-  const confirmDeleteNote = () => {
-    if (noteToDeleteId) {
-      setNotes(notes.filter(n => n.id !== noteToDeleteId));
-      setNoteToDeleteId(null);
-      setIsEditNoteModalOpen(false);
-      setEditingNoteItem(null);
+  const confirmDeleteCoupon = () => {
+    if (couponToDeleteId) {
+      setCoupons(coupons.filter(c => c.id !== couponToDeleteId));
+      setCouponToDeleteId(null);
+      setIsCouponModalOpen(false);
     }
   };
 
@@ -254,7 +258,7 @@ const PrepView: React.FC<PrepViewProps> = ({ members, setMembers, tripConfig, se
   const tabs: { id: PrepTab; label: string; icon: any }[] = [
     { id: 'checklist', label: '清單', icon: ClipboardList },
     { id: 'emergency', label: '緊急', icon: ShieldAlert },
-    { id: 'notes', label: '筆記', icon: StickyNote },
+    { id: 'coupons', label: '票券', icon: CouponIcon },
     { id: 'members', label: '成員', icon: Users },
     { id: 'settings', label: '設定', icon: Settings },
   ];
@@ -360,7 +364,7 @@ const PrepView: React.FC<PrepViewProps> = ({ members, setMembers, tripConfig, se
             </div>
             <div className="space-y-3">
               {todo.map((item) => (
-                <div key={item.id} onClick={() => toggleList(todo, setTodo, item.id)} className={`w-full bg-slate-50 rounded-2xl py-2.5 px-4 border border-slate-100 flex items-center gap-4 transition-all ${!isEditingChecklist ? 'active:scale-[0.98] cursor-pointer' : ''} ${draggedItemId === item.id ? 'opacity-40 border-dashed' : ''}`}>
+                <div key={item.id} onClick={() => toggleList(todo, setTodo, item.id)} className={`w-full bg-slate-50 rounded-2xl py-2.5 px-4 border border-slate-100 flex items-center gap-4 transition-all ${!isEditingChecklist ? 'active:scale-[0.98] cursor-pointer' : ''}`}>
                   {item.checked ? <CheckCircle2 className="text-blue-500" /> : <Circle className="text-slate-200" />}
                   <span className={`font-bold text-left flex-1 text-sm ${item.checked ? 'line-through text-slate-400 font-normal' : 'text-slate-700'}`}>{item.text}</span>
                   {isEditingChecklist && (
@@ -457,29 +461,73 @@ const PrepView: React.FC<PrepViewProps> = ({ members, setMembers, tripConfig, se
         </div>
       )}
 
-      {activePrepTab === 'notes' && (
+      {activePrepTab === 'coupons' && (
         <div className="space-y-6 animate-in fade-in slide-in-from-right duration-300">
-          <section>
-            <h2 className="text-xl font-black mb-4 px-2 flex items-center gap-2">
-              <div className="p-2 bg-blue-50 rounded-xl"><StickyNote className="text-blue-600" size={20} /></div>
-              重要筆記
+          <div className="flex justify-between items-center px-2">
+            <h2 className="text-xl font-black flex items-center gap-2">
+              <div className="p-2 bg-blue-50 rounded-xl"><CouponIcon className="text-blue-600" size={20} /></div>
+              商店折價券
             </h2>
-            <div className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm mb-6">
-              <textarea placeholder="記錄筆記..." value={newNote} onChange={(e) => setNewNote(e.target.value)} className="w-full h-24 bg-slate-50 border-none rounded-2xl p-4 text-sm font-bold focus:ring-2 focus:ring-blue-100 resize-none" />
-              <button onClick={addNote} disabled={!newNote.trim()} className="w-full mt-3 py-3 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-100 active:scale-[0.98]">新增筆記</button>
-            </div>
-            <div className="grid grid-cols-1 gap-4">
-              {notes.map(note => (
-                <div 
-                  key={note.id} 
-                  onClick={() => handleStartEditNote(note)}
-                  className="bg-white px-5 py-3 rounded-3xl border border-slate-100 shadow-sm relative group cursor-pointer hover:border-blue-200 active:scale-[0.99] transition-all"
+            <div className="flex items-center gap-2">
+              {isEditingCoupons && (
+                <button 
+                  onClick={() => handleOpenCouponModal()} 
+                  className="p-2 bg-blue-600 text-white rounded-full shadow-lg shadow-blue-100 active:scale-90 transition-all"
                 >
-                  <p className="text-slate-700 text-sm font-medium leading-relaxed pr-8">{note.content}</p>
-                </div>
-              ))}
+                  <Plus size={18} />
+                </button>
+              )}
+              <button 
+                onClick={() => setIsEditingCoupons(!isEditingCoupons)}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold transition-all active:scale-95 border ${
+                  isEditingCoupons 
+                  ? 'bg-slate-900 border-slate-900 text-white' 
+                  : 'bg-white border-slate-200 text-slate-500'
+                }`}
+              >
+                {isEditingCoupons ? <Check size={14} /> : <Edit3 size={14} />}
+                <span>{isEditingCoupons ? '完成' : '編輯'}</span>
+              </button>
             </div>
-          </section>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            {coupons.map(coupon => (
+              <div 
+                key={coupon.id} 
+                onClick={() => {
+                  if (isEditingCoupons) {
+                    handleOpenCouponModal(coupon);
+                  } else {
+                    setPreviewCoupon(coupon);
+                  }
+                }}
+                className="bg-white rounded-[2rem] overflow-hidden border border-slate-100 shadow-sm transition-all active:scale-[0.98] cursor-pointer group hover:border-blue-400 relative"
+              >
+                <div className="aspect-square bg-slate-50 relative overflow-hidden">
+                  <img src={coupon.image} className="w-full h-full object-cover" alt={coupon.title} />
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
+                  {isEditingCoupons && (
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); setCouponToDeleteId(coupon.id); }}
+                      className="absolute top-2 right-2 p-2 bg-red-50 text-red-500 rounded-full active:scale-90 transition-transform shadow-sm z-20"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  )}
+                </div>
+                <div className="p-3">
+                  <p className="text-xs font-black text-slate-800 truncate">{coupon.title}</p>
+                </div>
+              </div>
+            ))}
+            {coupons.length === 0 && (
+              <div className="col-span-2 text-center py-20 bg-white rounded-[2.5rem] border border-dashed border-slate-200">
+                <CouponIcon size={48} className="mx-auto text-slate-100 mb-4" />
+                <p className="text-sm font-bold text-slate-400">目前尚無折價券，點擊編輯進入新增</p>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -536,6 +584,114 @@ const PrepView: React.FC<PrepViewProps> = ({ members, setMembers, tripConfig, se
                 )}
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* 圖片預覽 Overlay */}
+      {previewCoupon && (
+        <div 
+          className="fixed inset-0 z-[300] bg-slate-900/95 backdrop-blur-xl flex flex-col items-center justify-center p-6 animate-in fade-in duration-300"
+          onClick={() => setPreviewCoupon(null)}
+        >
+          <button className="absolute top-12 right-6 p-3 bg-white/10 text-white rounded-full backdrop-blur-md">
+            <X size={24} />
+          </button>
+          <div className="w-full max-w-lg aspect-[4/5] bg-white rounded-[2rem] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300">
+            <img src={previewCoupon.image} className="w-full h-full object-contain bg-slate-50" alt={previewCoupon.title} />
+          </div>
+          <p className="mt-6 text-white font-black text-xl tracking-tight">{previewCoupon.title}</p>
+          <p className="mt-2 text-white/50 text-xs font-bold uppercase tracking-widest">點擊背景關閉</p>
+        </div>
+      )}
+
+      {/* 折價券編輯/新增彈窗 */}
+      {isCouponModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-end justify-center px-4 pb-4">
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setIsCouponModalOpen(false)}></div>
+          <div className="relative w-full max-w-lg bg-white rounded-[2.5rem] shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-300">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6 px-1">
+                <h3 className="text-xl font-black flex items-center gap-2">
+                  <div className="p-2 bg-blue-50 rounded-xl text-blue-600"><CouponIcon size={20} /></div>
+                  {editingCoupon ? '編輯折價券' : '新增折價券'}
+                </h3>
+                <button onClick={() => setIsCouponModalOpen(false)} className="p-2 bg-slate-100 rounded-full text-slate-400"><X size={20} /></button>
+              </div>
+
+              <div className="space-y-5 max-h-[60vh] overflow-y-auto pr-1 hide-scrollbar">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">折價券照片</label>
+                  <div 
+                    onClick={() => couponFileInputRef.current?.click()} 
+                    className="w-full aspect-video bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl flex flex-col items-center justify-center cursor-pointer hover:bg-slate-100 transition-colors relative overflow-hidden"
+                  >
+                    {couponFormData.image ? (
+                      <>
+                        <img src={couponFormData.image} className="w-full h-full object-cover" alt="Coupon preview" />
+                        <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                          <Camera className="text-white" size={32} />
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <ImageIcon className="text-slate-200 mb-2" size={32} />
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">點擊上傳折價券截圖</span>
+                      </>
+                    )}
+                    <input type="file" ref={couponFileInputRef} onChange={handleCouponImageUpload} accept="image/*" className="hidden" />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">商店/名稱</label>
+                  <input 
+                    placeholder="例如：唐吉訶德、大國藥妝..." 
+                    value={couponFormData.title} 
+                    onChange={e => setCouponFormData(prev => ({ ...prev, title: e.target.value }))}
+                    className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 text-sm font-bold focus:ring-2 focus:ring-blue-600" 
+                  />
+                </div>
+              </div>
+
+              <div className="mt-8 flex gap-3">
+                <button onClick={() => setIsCouponModalOpen(false)} className="flex-1 py-4 bg-slate-100 rounded-2xl font-bold text-slate-500 active:scale-95 transition-all">取消</button>
+                <button 
+                  onClick={handleSaveCoupon} 
+                  disabled={!couponFormData.title || !couponFormData.image}
+                  className="flex-[2] py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  <Check size={18} /> {editingCoupon ? '儲存修改' : '加入票券'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 優惠券刪除確認彈窗 */}
+      {couponToDeleteId && (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center px-6">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setCouponToDeleteId(null)}></div>
+          <div className="relative w-full max-sm bg-white rounded-[2.5rem] shadow-2xl p-8 text-center animate-in zoom-in-95 duration-200">
+            <div className="w-16 h-16 bg-red-50 rounded-3xl flex items-center justify-center text-red-500 mx-auto mb-4">
+              <AlertTriangle size={32} />
+            </div>
+            <h3 className="text-xl font-black text-slate-800 mb-2">確定要刪除此票券？</h3>
+            <div className="flex flex-col gap-3">
+              <button 
+                onClick={confirmDeleteCoupon} 
+                className="w-full py-4 bg-red-500 text-white rounded-2xl font-bold shadow-lg shadow-red-100 active:scale-95 transition-all"
+              >
+                確認刪除
+              </button>
+              <button 
+                onClick={() => setCouponToDeleteId(null)} 
+                className="w-full py-4 bg-slate-100 text-slate-500 rounded-2xl font-bold active:scale-95 transition-all"
+              >
+                取消
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -705,50 +861,6 @@ const PrepView: React.FC<PrepViewProps> = ({ members, setMembers, tripConfig, se
         </div>
       )}
 
-      {/* 筆記編輯彈窗 */}
-      {isEditNoteModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-end justify-center px-4 pb-4">
-          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => { setIsEditNoteModalOpen(false); setEditingNoteItem(null); }}></div>
-          <div className="relative w-full max-w-lg bg-white rounded-[2.5rem] shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-300">
-            <div className="p-6">
-              <div className="flex justify-between items-center mb-6 px-1">
-                <h3 className="text-xl font-black flex items-center gap-2">
-                  <div className="p-2 bg-blue-50 rounded-xl text-blue-600"><StickyNote size={20} /></div>
-                  編輯筆記
-                </h3>
-                <button onClick={() => { setIsEditNoteModalOpen(false); setEditingNoteItem(null); }} className="p-2 bg-slate-100 rounded-full text-slate-400 hover:bg-slate-200 transition-colors"><X size={20} /></button>
-              </div>
-
-              <div className="space-y-4">
-                <textarea 
-                  autoFocus
-                  value={editNoteContent} 
-                  onChange={e => setEditNoteContent(e.target.value)}
-                  className="w-full h-40 bg-slate-50 border-none rounded-2xl p-5 text-sm font-bold focus:ring-2 focus:ring-blue-600 resize-none" 
-                />
-              </div>
-
-              <div className="mt-8 flex gap-3">
-                <button 
-                  onClick={() => handleDeleteNote(editingNoteItem!.id)} 
-                  className="px-4 py-4 bg-red-50 text-red-500 rounded-2xl font-bold active:scale-95 transition-all"
-                >
-                  <Trash2 size={20} />
-                </button>
-                <button onClick={() => { setIsEditNoteModalOpen(false); setEditingNoteItem(null); }} className="flex-1 py-4 bg-slate-100 rounded-2xl font-bold text-slate-500 active:scale-95 transition-all">取消</button>
-                <button 
-                  onClick={handleSaveEditedNote} 
-                  disabled={!editNoteContent.trim()}
-                  className="flex-[2] py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                >
-                  <Check size={18} /> 儲存修改
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* 緊急聯絡人刪除確認彈窗 */}
       {emergencyToDeleteId && (
         <div className="fixed inset-0 z-[250] flex items-center justify-center px-6">
@@ -830,36 +942,6 @@ const PrepView: React.FC<PrepViewProps> = ({ members, setMembers, tripConfig, se
               </button>
               <button 
                 onClick={() => setMemberToDeleteId(null)} 
-                className="w-full py-4 bg-slate-100 text-slate-500 rounded-2xl font-bold active:scale-95 transition-all"
-              >
-                取消
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 筆記刪除確認彈窗 */}
-      {noteToDeleteId && (
-        <div className="fixed inset-0 z-[250] flex items-center justify-center px-6">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setNoteToDeleteId(null)}></div>
-          <div className="relative w-full max-sm bg-white rounded-[2.5rem] shadow-2xl p-8 text-center animate-in zoom-in-95 duration-200">
-            <div className="w-16 h-16 bg-red-50 rounded-3xl flex items-center justify-center text-red-500 mx-auto mb-4">
-              <AlertTriangle size={32} />
-            </div>
-            <h3 className="text-xl font-black text-slate-800 mb-2">確定要刪除這則筆記？</h3>
-            <p className="text-sm text-slate-500 font-medium mb-8 leading-relaxed line-clamp-2 px-2">
-              「{notes.find(n => n.id === noteToDeleteId)?.content}」
-            </p>
-            <div className="flex flex-col gap-3">
-              <button 
-                onClick={confirmDeleteNote} 
-                className="w-full py-4 bg-red-500 text-white rounded-2xl font-bold shadow-lg shadow-red-100 active:scale-95 transition-all"
-              >
-                確認刪除
-              </button>
-              <button 
-                onClick={() => setNoteToDeleteId(null)} 
                 className="w-full py-4 bg-slate-100 text-slate-500 rounded-2xl font-bold active:scale-95 transition-all"
               >
                 取消

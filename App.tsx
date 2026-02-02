@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'https://esm.sh/react@19.2.3';
 import { Plane, Hotel, Ticket as TicketIcon, Utensils, Calendar, Wallet, ShoppingBag, ClipboardList, Users, Globe, Check, ShieldCheck, ExternalLink, AlertTriangle, RefreshCw, Key, ShieldAlert } from 'https://esm.sh/lucide-react@0.563.0';
-import { doc, onSnapshot, setDoc, getDoc } from 'https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js';
+import { doc, onSnapshot, setDoc, getDoc, enableIndexedDbPersistence } from 'https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js';
 import { db } from './firebase.ts';
-import { TabType, Flight, Transport, Accommodation, Ticket, Restaurant, Member, ShoppingItem, TripConfig, ScheduleItem, Transaction, ChecklistItem, NoteItem } from './types.ts';
+import { TabType, Flight, Transport, Accommodation, Ticket, Restaurant, Member, ShoppingItem, TripConfig, ScheduleItem, Transaction, ChecklistItem, CouponItem } from './types.ts';
 import { COLORS, DEFAULT_FLIGHTS, EXCHANGE_RATE } from './constants.tsx';
 import BookingView from './components/BookingView.tsx';
 import ItineraryView from './components/ItineraryView.tsx';
@@ -42,9 +42,22 @@ const App: React.FC = () => {
   const [exchangeRate, setExchangeRate] = useState<string>(EXCHANGE_RATE.toString());
   const [todo, setTodo] = useState<ChecklistItem[]>([]);
   const [packing, setPacking] = useState<ChecklistItem[]>([]);
-  const [notes, setNotes] = useState<NoteItem[]>([]);
+  const [coupons, setCoupons] = useState<CouponItem[]>([]);
 
-  // --- 封裝寫入函式 (核心修正) ---
+  // --- 啟用本地持久化快取 ---
+  useEffect(() => {
+    enableIndexedDbPersistence(db).catch((err) => {
+      if (err.code === 'failed-precondition') {
+        // 多個標籤頁開啟時，只有一個能啟用持久化
+        console.warn('Firestore Persistence failed: Multiple tabs open');
+      } else if (err.code === 'unimplemented') {
+        // 瀏覽器不支援
+        console.warn('Firestore Persistence failed: Browser not supported');
+      }
+    });
+  }, []);
+
+  // --- 封裝寫入函式 ---
   const saveToCloud = () => {
     console.log("📤 正在同步資料到 Firebase...");
     setDoc(tripDocRef, {
@@ -61,8 +74,8 @@ const App: React.FC = () => {
       exchangeRate, 
       todo, 
       packing, 
-      notes,
-      lastUpdated: new Date().toISOString(), // 統一使用 lastUpdated 欄位
+      coupons,
+      lastUpdated: new Date().toISOString(),
       initialized: true
     }, { merge: true }).then(() => {
       console.log("✅ 同步完成");
@@ -71,16 +84,17 @@ const App: React.FC = () => {
     });
   };
 
-  // --- 核心同步邏輯 (監聽雲端) ---
+  // --- 核心同步邏輯 (監聽雲端與快取) ---
   useEffect(() => {
-    console.log("📡 啟動實時同步監聽...");
+    console.log("📡 啟動實時同步監聽 (含快取優先)...");
     
     const unsubscribe = onSnapshot(tripDocRef, (snap) => {
+      // 排除本地尚未寫入雲端的暫時狀態，確保資料流穩定
       if (snap.metadata.hasPendingWrites) return;
 
       if (snap.exists()) {
         const cloud = snap.data();
-        console.log("📥 收到雲端更新:", cloud.lastUpdated);
+        console.log(`📥 收到更新 (來源: ${snap.metadata.fromCache ? '快取' : '雲端'})`);
         isCloudUpdate.current = true;
         
         if (cloud.tripConfig) setTripConfig(cloud.tripConfig);
@@ -96,11 +110,11 @@ const App: React.FC = () => {
         if (cloud.exchangeRate) setExchangeRate(cloud.exchangeRate);
         if (cloud.todo) setTodo(cloud.todo);
         if (cloud.packing) setPacking(cloud.packing);
-        if (cloud.notes) setNotes(cloud.notes);
+        if (cloud.coupons) setCoupons(cloud.coupons);
         
         setTimeout(() => { isCloudUpdate.current = false; }, 500);
       } else {
-        console.log("⚠️ 雲端為空，準備初始化...");
+        console.log("⚠️ 雲端/快取為空，準備初始化...");
         saveToCloud();
       }
       setHasLoaded(true);
@@ -116,16 +130,14 @@ const App: React.FC = () => {
 
   // --- 監聽本地變動自動儲存 ---
   useEffect(() => {
-    // 只有在資料已載入、且不是因為雲端推過來才儲存
     if (!hasLoaded || isCloudUpdate.current || permissionError) return;
     
     const timer = setTimeout(() => {
       saveToCloud();
-    }, 1000); // 縮短至 1 秒，讓更新更即時
+    }, 1000);
     
     return () => clearTimeout(timer);
-    // 這裡列出所有需要被監控的狀態
-  }, [tripConfig, members, flights, transports, hotels, tickets, restaurants, shoppingItems, scheduleItems, expenses, exchangeRate, todo, packing, notes]);
+  }, [tripConfig, members, flights, transports, hotels, tickets, restaurants, shoppingItems, scheduleItems, expenses, exchangeRate, todo, packing, coupons]);
 
   const renderContent = () => {
     switch (activeTab) {
@@ -133,7 +145,7 @@ const App: React.FC = () => {
       case 'booking': return <BookingView flights={flights} setFlights={setFlights} transports={transports} setTransports={setTransports} hotels={hotels} setHotels={setHotels} tickets={tickets} setTickets={setTickets} restaurants={restaurants} setRestaurants={setRestaurants} members={members} isEditable={true} />;
       case 'expenses': return <ExpenseView members={members} isEditable={true} currencies={tripConfig.currencies} expenses={expenses} setExpenses={setExpenses} exchangeRate={exchangeRate} setExchangeRate={setExchangeRate} />;
       case 'shopping': return <ShoppingView items={shoppingItems} setItems={setShoppingItems} members={members} isEditable={true} activeCurrencies={tripConfig.currencies} />;
-      case 'prep': return <PrepView members={members} setMembers={setMembers} tripConfig={tripConfig} setTripConfig={setTripConfig} todo={todo} setTodo={setTodo} packing={packing} setPacking={setPacking} notes={notes} setNotes={setNotes} />;
+      case 'prep': return <PrepView members={members} setMembers={setMembers} tripConfig={tripConfig} setTripConfig={setTripConfig} todo={todo} setTodo={setTodo} packing={packing} setPacking={setPacking} coupons={coupons} setCoupons={setCoupons} />;
       default: return null;
     }
   };
@@ -145,7 +157,7 @@ const App: React.FC = () => {
         <div className="flex items-center gap-1.5">
           <div className={`w-1 h-1 rounded-full ${permissionError ? 'bg-red-500' : 'bg-emerald-500 animate-pulse'}`}></div>
           <span className={`text-[8px] font-black uppercase tracking-widest ${permissionError ? 'text-red-500' : 'text-emerald-500'}`}>
-            {permissionError ? '雲端權限拒絕' : '雲端讀寫就緒'}
+            {permissionError ? '雲端權限拒絕' : '雲端快取同步中'}
           </span>
         </div>
       </header>
