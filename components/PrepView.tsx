@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'https://esm.sh/react@19.2.3';
 import { ClipboardList, Plus, CheckCircle2, Circle, ShieldAlert, Users, Trash2, UserPlus, Check, AlertTriangle, X, GripVertical, Settings, Globe, Wallet, Edit3, PhoneCall, StickyNote } from 'https://esm.sh/lucide-react@0.563.0';
-import { Member, TripConfig, ChecklistItem, CouponItem, Accommodation, ShoppingItem, ScheduleItem } from '../types.ts';
+import { Member, TripConfig, ChecklistItem, NoteItem, Accommodation, ShoppingItem, ScheduleItem } from '../types.ts';
 
 type PrepTab = 'checklist' | 'emergency' | 'notes' | 'members' | 'settings';
 
@@ -19,8 +19,8 @@ interface PrepViewProps {
   setTodo: React.Dispatch<React.SetStateAction<ChecklistItem[]>>;
   packing: ChecklistItem[];
   setPacking: React.Dispatch<React.SetStateAction<ChecklistItem[]>>;
-  coupons: CouponItem[];
-  setCoupons: React.Dispatch<React.SetStateAction<CouponItem[]>>;
+  notes: NoteItem[];
+  setNotes: React.Dispatch<React.SetStateAction<NoteItem[]>>;
   setHotels?: React.Dispatch<React.SetStateAction<Accommodation[]>>;
   setShoppingItems?: React.Dispatch<React.SetStateAction<ShoppingItem[]>>;
   setScheduleItems?: React.Dispatch<React.SetStateAction<ScheduleItem[]>>;
@@ -31,7 +31,7 @@ interface PrepViewProps {
 
 const MEMBER_COLORS = [
   'bg-blue-500', 'bg-pink-500', 'bg-emerald-500', 'bg-amber-500', 
-  'bg-purple-500', 'bg-red-500', 'bg-indigo-500', 'bg-slate-500',
+  'bg-purple-500', 'bg-red-500', 'bg-indigo-Ind-500', 'bg-slate-500',
   'bg-orange-500', 'bg-teal-500', 'bg-rose-500', 'bg-cyan-500'
 ];
 
@@ -49,7 +49,7 @@ const PrepView: React.FC<PrepViewProps> = ({
   tripConfig, setTripConfig, 
   todo, setTodo, 
   packing, setPacking, 
-  coupons, setCoupons,
+  notes, setNotes,
   setHotels, setShoppingItems, setScheduleItems,
   hotels, shoppingItems, scheduleItems
 }) => {
@@ -60,7 +60,7 @@ const PrepView: React.FC<PrepViewProps> = ({
   const [editingMember, setEditingMember] = useState<Member | null>(null);
   
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
-  const [editingNote, setEditingNote] = useState<CouponItem | null>(null);
+  const [editingNoteItem, setEditingNoteItem] = useState<NoteItem | null>(null);
   const [noteFormData, setNoteFormData] = useState({ title: '', content: '' });
   const [noteToDeleteId, setNoteToDeleteId] = useState<string | null>(null);
   const [draggedNoteId, setDraggedNoteId] = useState<string | null>(null);
@@ -108,24 +108,24 @@ const PrepView: React.FC<PrepViewProps> = ({
     e.preventDefault();
     if (!isEditingNotes || !draggedNoteId || draggedNoteId === targetId) return;
 
-    const newList = [...coupons];
+    const newList = [...notes];
     const draggedIndex = newList.findIndex(c => c.id === draggedNoteId);
     const targetIndex = newList.findIndex(c => c.id === targetId);
     
     if (draggedIndex !== -1 && targetIndex !== -1) {
       const [draggedItem] = newList.splice(draggedIndex, 1);
       newList.splice(targetIndex, 0, draggedItem);
-      setCoupons(newList);
+      setNotes(newList);
     }
     setDraggedNoteId(null);
   };
 
-  const handleOpenNoteModal = (note?: CouponItem) => {
+  const handleOpenNoteModal = (note?: NoteItem) => {
     if (note) {
-      setEditingNote(note);
-      setNoteFormData({ title: note.title, content: note.image }); // Reusing image field as content to save space/types
+      setEditingNoteItem(note);
+      setNoteFormData({ title: note.title, content: note.content });
     } else {
-      setEditingNote(null);
+      setEditingNoteItem(null);
       setNoteFormData({ title: '', content: '' });
     }
     setIsNoteModalOpen(true);
@@ -134,17 +134,17 @@ const PrepView: React.FC<PrepViewProps> = ({
   const handleSaveNote = () => {
     if (!noteFormData.title) return;
 
-    if (editingNote) {
-      setCoupons(coupons.map(c => c.id === editingNote.id ? { ...c, title: noteFormData.title, image: noteFormData.content } : c));
+    if (editingNoteItem) {
+      setNotes(notes.map(c => c.id === editingNoteItem.id ? { ...c, title: noteFormData.title, content: noteFormData.content } : c));
     } else {
-      setCoupons([{ id: Date.now().toString(), title: noteFormData.title, image: noteFormData.content }, ...coupons]);
+      setNotes([{ id: Date.now().toString(), title: noteFormData.title, content: noteFormData.content }, ...notes]);
     }
     setIsNoteModalOpen(false);
   };
 
   const confirmDeleteNote = () => {
     if (noteToDeleteId) {
-      setCoupons(prev => prev.filter(c => c.id !== noteToDeleteId));
+      setNotes(prev => prev.filter(c => c.id !== noteToDeleteId));
       setNoteToDeleteId(null);
     }
   };
@@ -466,7 +466,7 @@ const PrepView: React.FC<PrepViewProps> = ({
           </div>
           
           <div className="grid grid-cols-1 gap-4">
-            {coupons.map(note => (
+            {notes.map(note => (
               <div 
                 key={note.id} 
                 draggable={isEditingNotes}
@@ -480,7 +480,7 @@ const PrepView: React.FC<PrepViewProps> = ({
                 <div className="flex justify-between items-start gap-4">
                    <div className="flex-1 min-w-0">
                       <h4 className="font-black text-slate-800 text-lg mb-2 truncate">{note.title}</h4>
-                      <p className="text-[11px] text-slate-500 font-bold leading-relaxed line-clamp-3 whitespace-pre-wrap">{note.image}</p>
+                      <p className="text-[11px] text-slate-500 font-bold leading-relaxed line-clamp-3 whitespace-pre-wrap">{note.content}</p>
                    </div>
                    {isEditingNotes && (
                     <div className="flex flex-col gap-2">
@@ -495,7 +495,7 @@ const PrepView: React.FC<PrepViewProps> = ({
                 </div>
               </div>
             ))}
-            {coupons.length === 0 && (
+            {notes.length === 0 && (
               <div className="text-center py-20 bg-white rounded-[2.5rem] border border-dashed border-slate-200">
                 <StickyNote size={48} className="mx-auto text-slate-100 mb-4" />
                 <p className="text-sm font-bold text-slate-400">目前尚無筆記</p>
@@ -561,7 +561,7 @@ const PrepView: React.FC<PrepViewProps> = ({
               <div className="flex justify-between items-center mb-6 px-1">
                 <h3 className="text-xl font-black flex items-center gap-2">
                   <div className="p-2 bg-blue-50 rounded-xl text-blue-600"><StickyNote size={20} /></div>
-                  {editingNote ? '編輯筆記' : '新增筆記'}
+                  {editingNoteItem ? '編輯筆記' : '新增筆記'}
                 </h3>
                 <button onClick={() => setIsNoteModalOpen(false)} className="p-2 bg-slate-100 rounded-full text-slate-400"><X size={20} /></button>
               </div>
@@ -577,7 +577,7 @@ const PrepView: React.FC<PrepViewProps> = ({
               </div>
               <div className="mt-8 flex gap-3">
                 <button onClick={() => setIsNoteModalOpen(false)} className="flex-1 py-4 bg-slate-100 rounded-2xl font-bold text-slate-500 active:scale-95 transition-all">取消</button>
-                <button onClick={handleSaveNote} disabled={!noteFormData.title} className="flex-[2] py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50"><Check size={18} /> {editingNote ? '儲存修改' : '確認新增'}</button>
+                <button onClick={handleSaveNote} disabled={!noteFormData.title} className="flex-[2] py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50"><Check size={18} /> {editingNoteItem ? '儲存修改' : '確認新增'}</button>
               </div>
             </div>
           </div>

@@ -1,9 +1,8 @@
-
 import React, { useState, useEffect, useRef } from 'https://esm.sh/react@19.2.3';
 import { Plane, Hotel, Ticket as TicketIcon, Utensils, Calendar, Wallet, ShoppingBag, ClipboardList, Users, Globe, Check, ShieldCheck, ExternalLink, AlertTriangle, RefreshCw, Key, ShieldAlert } from 'https://esm.sh/lucide-react@0.563.0';
 import { doc, onSnapshot, setDoc, enableIndexedDbPersistence } from 'https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js';
 import { db } from './firebase.ts';
-import { TabType, Flight, Transport, Accommodation, Ticket, Restaurant, Member, ShoppingItem, TripConfig, ScheduleItem, Transaction, ChecklistItem, CouponItem } from './types.ts';
+import { TabType, Flight, Transport, Accommodation, Ticket, Restaurant, Member, ShoppingItem, TripConfig, ScheduleItem, Transaction, ChecklistItem, NoteItem } from './types.ts';
 import { DEFAULT_FLIGHTS, EXCHANGE_RATE } from './constants.tsx';
 import BookingView from './components/BookingView.tsx';
 import ItineraryView from './components/ItineraryView.tsx';
@@ -43,7 +42,7 @@ const App: React.FC = () => {
   const [exchangeRate, setExchangeRate] = useState<string>(EXCHANGE_RATE.toString());
   const [todo, setTodo] = useState<ChecklistItem[]>([]);
   const [packing, setPacking] = useState<ChecklistItem[]>([]);
-  const [coupons, setCoupons] = useState<CouponItem[]>([]);
+  const [notes, setNotes] = useState<NoteItem[]>([]);
 
   // --- 啟用本地持久化快取 ---
   useEffect(() => {
@@ -73,7 +72,7 @@ const App: React.FC = () => {
       exchangeRate, 
       todo, 
       packing, 
-      coupons,
+      notes,
       lastUpdated: new Date().toISOString(),
       initialized: true
     }, { merge: true }).then(() => {
@@ -108,7 +107,9 @@ const App: React.FC = () => {
         if (cloud.exchangeRate) setExchangeRate(cloud.exchangeRate);
         if (cloud.todo) setTodo(cloud.todo);
         if (cloud.packing) setPacking(cloud.packing);
-        if (cloud.coupons) setCoupons(cloud.coupons);
+        // 兼容舊資料欄位 coupons 並轉換為 notes
+        if (cloud.notes) setNotes(cloud.notes);
+        else if (cloud.coupons) setNotes(cloud.coupons);
         
         setTimeout(() => { isCloudUpdate.current = false; }, 500);
       } else {
@@ -135,7 +136,7 @@ const App: React.FC = () => {
     }, 1000);
     
     return () => clearTimeout(timer);
-  }, [tripConfig, members, flights, transports, hotels, tickets, restaurants, shoppingItems, scheduleItems, expenses, exchangeRate, todo, packing, coupons]);
+  }, [tripConfig, members, flights, transports, hotels, tickets, restaurants, shoppingItems, scheduleItems, expenses, exchangeRate, todo, packing, notes]);
 
   const renderContent = () => {
     switch (activeTab) {
@@ -149,7 +150,7 @@ const App: React.FC = () => {
           tripConfig={tripConfig} setTripConfig={setTripConfig} 
           todo={todo} setTodo={setTodo} 
           packing={packing} setPacking={setPacking} 
-          coupons={coupons} setCoupons={setCoupons}
+          notes={notes} setNotes={setNotes}
           setHotels={setHotels} hotels={hotels}
           setShoppingItems={setShoppingItems} shoppingItems={shoppingItems}
           setScheduleItems={setScheduleItems} scheduleItems={scheduleItems}

@@ -148,8 +148,8 @@ export interface ChecklistItem {
   checked: boolean;
 }
 
-export interface CouponItem {
+export interface NoteItem {
   id: string;
   title: string;
-  image: string;
+  content: string;
 }
