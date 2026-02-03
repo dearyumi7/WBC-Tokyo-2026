@@ -221,7 +221,6 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
   const [itemToDeleteId, setItemToDeleteId] = useState<string | null>(null);
   const [isTransportDeleteConfirmOpen, setIsTransportDeleteConfirmOpen] = useState(false);
 
-  const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
   const [draggedDetailId, setDraggedDetailId] = useState<string | null>(null);
 
   const [selectedSpotForDetail, setSelectedSpotForDetail] = useState<ScheduleItem | null>(null);
@@ -458,6 +457,33 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
     updateDoc(tripRef, { scheduleItems: newList });
   };
 
+  const moveScheduleItem = (id: string, direction: 'up' | 'down', e: React.MouseEvent) => {
+    e.stopPropagation();
+    const currentIndex = scheduleItems.findIndex(item => item.id === id);
+    if (currentIndex === -1) return;
+
+    const currentItem = scheduleItems[currentIndex];
+    const sameDateItems = scheduleItems.filter(item => item.date === currentItem.date);
+    const indexInDay = sameDateItems.findIndex(item => item.id === id);
+
+    let targetItem = null;
+    if (direction === 'up' && indexInDay > 0) {
+      targetItem = sameDateItems[indexInDay - 1];
+    } else if (direction === 'down' && indexInDay < sameDateItems.length - 1) {
+      targetItem = sameDateItems[indexInDay + 1];
+    }
+
+    if (targetItem) {
+      const targetGlobalIndex = scheduleItems.findIndex(item => item.id === targetItem.id);
+      const newList = [...scheduleItems];
+      [newList[currentIndex], newList[targetGlobalIndex]] = [newList[targetGlobalIndex], newList[currentIndex]];
+      setScheduleItems(newList);
+      
+      const tripRef = doc(db, 'trips', 'main_trip_data');
+      updateDoc(tripRef, { scheduleItems: newList });
+    }
+  };
+
   const openTransportModal = (item: ScheduleItem, e: React.MouseEvent) => {
     e.stopPropagation();
     setActiveTransportItem(item);
@@ -604,37 +630,13 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
     setTransportFormData(prev => ({ ...prev, transfers: updated }));
   };
 
-  const handleDragStart = (e: React.DragEvent, id: string) => {
-    setDraggedItemId(id);
+  const handleDetailDragStart = (e: React.DragEvent, id: string) => {
+    setDraggedDetailId(id);
     e.dataTransfer.effectAllowed = 'move';
   };
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
-  };
-
-  const handleDrop = (e: React.DragEvent, targetId: string) => {
-    e.preventDefault();
-    if (!draggedItemId || draggedItemId === targetId) return;
-
-    const newList = [...scheduleItems];
-    const draggedIndex = newList.findIndex(item => item.id === draggedItemId);
-    const targetIndex = newList.findIndex(item => item.id === targetId);
-
-    if (draggedIndex !== -1 && targetIndex !== -1) {
-      const [draggedItem] = newList.splice(draggedIndex, 1);
-      newList.splice(targetIndex, 0, draggedItem);
-      setScheduleItems(newList);
-      
-      const tripRef = doc(db, 'trips', 'main_trip_data');
-      updateDoc(tripRef, { scheduleItems: newList });
-    }
-    setDraggedItemId(null);
-  };
-
-  const handleDetailDragStart = (e: React.DragEvent, id: string) => {
-    setDraggedDetailId(id);
-    e.dataTransfer.effectAllowed = 'move';
   };
 
   const handleDetailDrop = (e: React.DragEvent, targetId: string) => {
@@ -737,7 +739,7 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
         </div>
 
         <div className="relative pl-4 space-y-6 before:absolute before:left-6 before:top-2 before:bottom-2 before:w-[1px] before:bg-slate-200">
-          {filteredScheduleItems.map((item) => {
+          {filteredScheduleItems.map((item, idxInFiltered) => {
             const transportActive = !!item.plannedTransport;
             const transportExpanded = isTransportExpanded(item.id, item);
             const noteActive = !!item.customNote;
@@ -748,12 +750,7 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
               <div 
                 key={item.id} 
                 data-id={item.id}
-                className={`itinerary-item-row relative flex flex-col gap-3 group transition-opacity ${draggedItemId === item.id ? 'opacity-40 grayscale scale-95' : ''} ${isEditMode ? 'select-none' : ''}`}
-                draggable={isEditMode}
-                onDragStart={(e) => handleDragStart(e, item.id)}
-                onDragOver={handleDragOver}
-                onDrop={(e) => handleDrop(e, item.id)}
-                onDragEnd={() => setDraggedItemId(null)}
+                className={`itinerary-item-row relative flex flex-col gap-3 group transition-opacity ${isEditMode ? 'select-none' : ''}`}
               >
                 <div className="flex gap-6">
                   <div className={`w-4 h-4 rounded-full border-2 border-white shadow-sm shrink-0 z-10 mt-1.5 transition-colors duration-300 ${
@@ -761,17 +758,29 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
                   }`}></div>
                   <div 
                     onClick={() => isEditMode ? handleEditItem(item) : handleOpenSpotDetail(item)}
-                    className={`flex-1 bg-white p-4 rounded-3xl shadow-sm border border-slate-100 transition-all relative ${isEditMode ? 'border-blue-400 ring-2 ring-blue-50 cursor-grab active:cursor-grabbing' : (hasDetails ? 'hover:border-blue-400 hover:shadow-md cursor-pointer' : '')}`}
+                    className={`flex-1 bg-white p-4 rounded-3xl shadow-sm border border-slate-100 transition-all relative ${isEditMode ? 'border-blue-400 ring-2 ring-blue-50' : (hasDetails ? 'hover:border-blue-400 hover:shadow-md cursor-pointer' : '')}`}
                   >
                     {isEditMode && (
-                      <div className="absolute left-0 top-0 bottom-0 w-12 flex items-center justify-center -translate-x-8 text-slate-300 pointer-events-none">
-                        <GripVertical size={22} strokeWidth={2.5} />
-                      </div>
-                    )}
-                    {isEditMode && (
-                      <div className="absolute right-3 top-1/2 -translate-y-1/2 flex flex-col gap-2">
-                        <button onClick={(e) => { e.stopPropagation(); handleDelete(item.id, e); }} className="p-2 bg-red-50 text-red-500 rounded-full active:scale-90 transition-transform">
-                          <Trash2 size={16} />
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 flex flex-col gap-1 z-20">
+                        <button 
+                          disabled={idxInFiltered === 0} 
+                          onClick={(e) => moveScheduleItem(item.id, 'up', e)} 
+                          className={`p-1.5 rounded-full bg-white shadow-sm border border-slate-100 ${idxInFiltered === 0 ? 'text-slate-100 opacity-30' : 'text-slate-400 active:bg-slate-50'}`}
+                        >
+                          <ChevronUp size={16}/>
+                        </button>
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); handleDelete(item.id, e); }} 
+                          className="p-1.5 rounded-full bg-white shadow-sm border border-slate-100 text-red-400 active:bg-red-50"
+                        >
+                          <Trash2 size={16}/>
+                        </button>
+                        <button 
+                          disabled={idxInFiltered === filteredScheduleItems.length - 1} 
+                          onClick={(e) => moveScheduleItem(item.id, 'down', e)} 
+                          className={`p-1.5 rounded-full bg-white shadow-sm border border-slate-100 ${idxInFiltered === filteredScheduleItems.length - 1 ? 'text-slate-100 opacity-30' : 'text-slate-400 active:bg-slate-50'}`}
+                        >
+                          <ChevronDown size={16}/>
                         </button>
                       </div>
                     )}
@@ -790,7 +799,7 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
                         </div>
                       )}
                     </div>
-                    <p className="text-xs text-slate-500 flex items-center gap-1 mb-3">
+                    <p className="text-xs text-slate-500 flex items-center gap-1 mb-3 pr-8">
                       <MapPin size={12} /> {item.addr}
                     </p>
                     
