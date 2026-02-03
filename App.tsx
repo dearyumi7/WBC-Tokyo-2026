@@ -1,9 +1,10 @@
+
 import React, { useState, useEffect, useRef } from 'https://esm.sh/react@19.2.3';
 import { Plane, Hotel, Ticket as TicketIcon, Utensils, Calendar, Wallet, ShoppingBag, ClipboardList, Users, Globe, Check, ShieldCheck, ExternalLink, AlertTriangle, RefreshCw, Key, ShieldAlert } from 'https://esm.sh/lucide-react@0.563.0';
-import { doc, onSnapshot, setDoc, getDoc, enableIndexedDbPersistence } from 'https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js';
+import { doc, onSnapshot, setDoc, enableIndexedDbPersistence } from 'https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js';
 import { db } from './firebase.ts';
 import { TabType, Flight, Transport, Accommodation, Ticket, Restaurant, Member, ShoppingItem, TripConfig, ScheduleItem, Transaction, ChecklistItem, CouponItem } from './types.ts';
-import { COLORS, DEFAULT_FLIGHTS, EXCHANGE_RATE } from './constants.tsx';
+import { DEFAULT_FLIGHTS, EXCHANGE_RATE } from './constants.tsx';
 import BookingView from './components/BookingView.tsx';
 import ItineraryView from './components/ItineraryView.tsx';
 import ExpenseView from './components/ExpenseView.tsx';
@@ -48,10 +49,8 @@ const App: React.FC = () => {
   useEffect(() => {
     enableIndexedDbPersistence(db).catch((err) => {
       if (err.code === 'failed-precondition') {
-        // 多個標籤頁開啟時，只有一個能啟用持久化
         console.warn('Firestore Persistence failed: Multiple tabs open');
       } else if (err.code === 'unimplemented') {
-        // 瀏覽器不支援
         console.warn('Firestore Persistence failed: Browser not supported');
       }
     });
@@ -89,7 +88,6 @@ const App: React.FC = () => {
     console.log("📡 啟動實時同步監聽 (含快取優先)...");
     
     const unsubscribe = onSnapshot(tripDocRef, (snap) => {
-      // 排除本地尚未寫入雲端的暫時狀態，確保資料流穩定
       if (snap.metadata.hasPendingWrites) return;
 
       if (snap.exists()) {
@@ -145,7 +143,18 @@ const App: React.FC = () => {
       case 'booking': return <BookingView flights={flights} setFlights={setFlights} transports={transports} setTransports={setTransports} hotels={hotels} setHotels={setHotels} tickets={tickets} setTickets={setTickets} restaurants={restaurants} setRestaurants={setRestaurants} members={members} isEditable={true} />;
       case 'expenses': return <ExpenseView members={members} isEditable={true} currencies={tripConfig.currencies} expenses={expenses} setExpenses={setExpenses} exchangeRate={exchangeRate} setExchangeRate={setExchangeRate} />;
       case 'shopping': return <ShoppingView items={shoppingItems} setItems={setShoppingItems} members={members} isEditable={true} activeCurrencies={tripConfig.currencies} />;
-      case 'prep': return <PrepView members={members} setMembers={setMembers} tripConfig={tripConfig} setTripConfig={setTripConfig} todo={todo} setTodo={setTodo} packing={packing} setPacking={setPacking} coupons={coupons} setCoupons={setCoupons} />;
+      case 'prep': return (
+        <PrepView 
+          members={members} setMembers={setMembers} 
+          tripConfig={tripConfig} setTripConfig={setTripConfig} 
+          todo={todo} setTodo={setTodo} 
+          packing={packing} setPacking={setPacking} 
+          coupons={coupons} setCoupons={setCoupons}
+          setHotels={setHotels} hotels={hotels}
+          setShoppingItems={setShoppingItems} shoppingItems={shoppingItems}
+          setScheduleItems={setScheduleItems} scheduleItems={scheduleItems}
+        />
+      );
       default: return null;
     }
   };

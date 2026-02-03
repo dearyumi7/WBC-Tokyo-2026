@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'https://esm.sh/react@19.2.3';
-import { Plane, Hotel, Ticket as TicketIcon, Utensils, Plus, Edit2, Clock, MapPin, Info, Train, AlertCircle, Trash2, X, Check, ChevronUp, ChevronDown, Package, Armchair, DollarSign, Trophy, Castle, Camera, Music, Gamepad2, ShoppingCart, ExternalLink, Beef, Soup, Pizza, Coffee, Beer, IceCream, Sandwich, AlertTriangle } from 'https://esm.sh/lucide-react@0.563.0';
+import { Plane, Hotel, Ticket as TicketIcon, Utensils, Plus, MapPin, Info, Train, Trash2, X, Check, ChevronUp, ChevronDown, Package, Armchair, Trophy, Castle, Camera, Music, Gamepad2, ShoppingCart, ExternalLink, Beef, Soup, Pizza, Coffee, Beer, IceCream, Sandwich, AlertTriangle, Clock } from 'https://esm.sh/lucide-react@0.563.0';
 import { Flight, Transport, Accommodation, Ticket, Restaurant, Member } from '../types';
 
 interface BookingViewProps {
@@ -40,6 +40,27 @@ const RESTAURANT_ICONS = [
 ];
 
 const TRANSPORT_TYPES = ['新幹線', '巴士', '特急電車'];
+
+const compressImage = (base64Str: string, maxWidth = 800): Promise<string> => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.src = base64Str;
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let width = img.width;
+      let height = img.height;
+      if (width > maxWidth) {
+        height = (height * maxWidth) / width;
+        width = maxWidth;
+      }
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx?.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL('image/jpeg', 0.7));
+    };
+  });
+};
 
 const BookingView: React.FC<BookingViewProps> = ({ 
   flights, setFlights, 
@@ -142,8 +163,9 @@ const BookingView: React.FC<BookingViewProps> = ({
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setFormData(prev => ({ ...prev, image: reader.result as string }));
+      reader.onloadend = async () => {
+        const compressed = await compressImage(reader.result as string);
+        setFormData(prev => ({ ...prev, image: compressed }));
       };
       reader.readAsDataURL(file);
     }
@@ -192,7 +214,7 @@ const BookingView: React.FC<BookingViewProps> = ({
       if (modalType === 'flight') setFlights([...flights, processedData]);
       else if (modalType === 'transport') setTransports([...transports, processedData]);
       else if (modalType === 'hotel') {
-        processedData.image = processedData.image || 'https://picsum.photos/800/400?random=' + Date.now();
+        processedData.image = processedData.image || 'https://picsum.photos/120/60?random=' + Date.now();
         processedData.dates = `${processedData.checkIn} - ${processedData.checkOut}`;
         setHotels([...hotels, processedData]);
       } else if (modalType === 'ticket') {
@@ -242,7 +264,7 @@ const BookingView: React.FC<BookingViewProps> = ({
     );
   };
 
-  const AddButton = ({ onClick, colorClass }: { onClick: () => void, colorClass: string }) => (
+  const AddButton = ({ onClick }: { onClick: () => void }) => (
     <div className="flex justify-center mt-1 pb-1">
       <button 
         onClick={onClick} 
@@ -265,7 +287,6 @@ const BookingView: React.FC<BookingViewProps> = ({
 
   return (
     <div className="pb-10">
-      {/* Quick Nav */}
       <div className="sticky top-0 z-20 bg-slate-100/95 backdrop-blur-md -mx-4 px-4 py-3 border-b border-slate-200">
         <div className="grid grid-cols-5 gap-1 bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm">
           {navTabs.map((tab) => (
@@ -278,7 +299,6 @@ const BookingView: React.FC<BookingViewProps> = ({
       </div>
 
       <div className="space-y-10 mt-4">
-        {/* Flights Section */}
         <section id="flights-section" className="scroll-mt-20 bg-white rounded-3xl p-4 border border-slate-200 shadow-sm space-y-4">
           <div className="flex justify-between items-center px-1">
             <h2 className="text-lg font-bold flex items-center gap-2">
@@ -306,7 +326,6 @@ const BookingView: React.FC<BookingViewProps> = ({
                   </div>
                   <span className="text-[10px] font-bold bg-white text-blue-600 px-3 py-1 rounded-full border border-blue-100">{f.date}</span>
                 </div>
-                
                 <div className="bg-white border border-slate-100 rounded-2xl py-8 px-4">
                   <div className="flex items-center justify-between relative">
                     <div className="text-center w-1/3">
@@ -327,7 +346,6 @@ const BookingView: React.FC<BookingViewProps> = ({
                     </div>
                   </div>
                 </div>
-
                 <div className="grid grid-cols-2 gap-3 mt-3">
                   <div className="bg-white p-2.5 rounded-xl border border-slate-100 flex flex-col items-center justify-center text-center">
                     <div className="text-[9px] uppercase font-bold text-slate-400 flex items-center gap-1 mb-1"><Package size={10} /> Baggage</div>
@@ -340,7 +358,6 @@ const BookingView: React.FC<BookingViewProps> = ({
                     </div>
                   </div>
                 </div>
-
                 {f.note && (
                   <div className="mt-2 py-1.5 px-2.5 bg-blue-50/50 rounded-xl text-[10px] text-blue-700 flex gap-2">
                     <Info size={12} className="shrink-0 mt-0.5" />
@@ -349,11 +366,10 @@ const BookingView: React.FC<BookingViewProps> = ({
                 )}
               </div>
             ))}
-            {editModes.flight && <AddButton onClick={() => handleOpenModal('flight')} colorClass="text-blue-400 border-blue-100 bg-blue-100" />}
+            {editModes.flight && <AddButton onClick={() => handleOpenModal('flight')} />}
           </div>
         </section>
 
-        {/* Transport Section */}
         <section id="transport-section" className="scroll-mt-20 bg-white rounded-3xl p-4 border border-slate-200 shadow-sm space-y-4">
           <div className="flex justify-between items-center px-1">
             <h2 className="text-lg font-bold flex items-center gap-2">
@@ -401,7 +417,6 @@ const BookingView: React.FC<BookingViewProps> = ({
                     </div>
                   </div>
                 </div>
-                
                 <div className="mt-3">
                   <div className="bg-white p-3 rounded-xl border border-slate-100 space-y-2">
                     <div className="text-[9px] uppercase font-bold text-slate-400 flex items-center justify-center gap-1 mb-1 pb-1 border-b border-slate-50"><Armchair size={10} /> Seat</div>
@@ -427,7 +442,6 @@ const BookingView: React.FC<BookingViewProps> = ({
                     )}
                   </div>
                 </div>
-
                 {t.note && (
                   <div className="mt-2 py-1.5 px-2.5 bg-blue-50/50 rounded-xl text-[10px] text-blue-700 flex gap-2">
                     <Info size={12} className="shrink-0 mt-0.5" />
@@ -436,11 +450,10 @@ const BookingView: React.FC<BookingViewProps> = ({
                 )}
               </div>
             ))}
-            {editModes.transport && <AddButton onClick={() => handleOpenModal('transport')} colorClass="text-blue-400 border-blue-100 bg-blue-100" />}
+            {editModes.transport && <AddButton onClick={() => handleOpenModal('transport')} />}
           </div>
         </section>
 
-        {/* Hotels Section */}
         <section id="hotels-section" className="scroll-mt-20 bg-white rounded-3xl p-4 border border-slate-200 shadow-sm space-y-4">
           <div className="flex justify-between items-center px-1">
             <h2 className="text-lg font-bold flex items-center gap-2">
@@ -496,11 +509,10 @@ const BookingView: React.FC<BookingViewProps> = ({
                 </div>
               </div>
             ))}
-            {editModes.hotel && <AddButton onClick={() => handleOpenModal('hotel')} colorClass="text-blue-400 border-blue-100 bg-blue-100" />}
+            {editModes.hotel && <AddButton onClick={() => handleOpenModal('hotel')} />}
           </div>
         </section>
 
-        {/* Tickets Section */}
         <section id="tickets-section" className="scroll-mt-20 bg-white rounded-3xl p-4 border border-slate-200 shadow-sm space-y-5">
           <div className="flex justify-between items-center px-1">
             <h2 className="text-lg font-bold flex items-center gap-2">
@@ -530,12 +542,10 @@ const BookingView: React.FC<BookingViewProps> = ({
                       className={`bg-slate-50 rounded-[2rem] p-4 border border-slate-100 relative transition-all ${editModes.ticket ? 'pr-12 opacity-90 cursor-pointer hover:border-blue-400 hover:bg-blue-50/30' : ''}`}
                     >
                       {renderCardControls('ticket', globalIndex, i === 0 && Object.keys(groupedTickets)[0] === category, i === categoryTickets.length - 1 && Object.keys(groupedTickets)[Object.keys(groupedTickets).length-1] === category)}
-                      
                       <div className="flex justify-between items-center mb-3 px-1">
                         <span className="text-base font-bold text-slate-900 truncate flex-1 pr-4">{t.event}</span>
                         <span className="text-[10px] font-bold bg-white text-blue-600 px-3 py-1 rounded-full border border-blue-100 shrink-0">{t.date}</span>
                       </div>
-
                       <div className="bg-white border border-blue-100/30 rounded-2xl p-4 shadow-sm">
                         <div className="flex items-start gap-4">
                           <div className="p-3 bg-blue-50 rounded-2xl text-blue-500 shrink-0">
@@ -545,7 +555,6 @@ const BookingView: React.FC<BookingViewProps> = ({
                             {t.teams && (
                               <div className="text-sm font-black text-slate-800 leading-tight mb-1.5">{t.teams}</div>
                             )}
-                            
                             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mb-2">
                               <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400">
                                 <Clock size={12} className="text-blue-300" /> {t.time}
@@ -564,7 +573,6 @@ const BookingView: React.FC<BookingViewProps> = ({
                                 </a>
                               </div>
                             </div>
-
                             {(t.section || t.row || t.seat) && (
                               <div className="grid grid-cols-3 gap-2 border-t border-blue-50 pt-2.5">
                                 {t.section && (
@@ -590,7 +598,6 @@ const BookingView: React.FC<BookingViewProps> = ({
                           </div>
                         </div>
                       </div>
-
                       {t.notes && (
                         <div className="mt-2.5 py-2 px-3 bg-blue-50/50 rounded-xl text-[10px] text-blue-700 flex gap-2 border border-blue-100/30">
                           <Info size={12} className="shrink-0 mt-0.5 text-blue-400" />
@@ -603,10 +610,9 @@ const BookingView: React.FC<BookingViewProps> = ({
               </div>
             </div>
           ))}
-          {editModes.ticket && <AddButton onClick={() => handleOpenModal('ticket')} colorClass="text-blue-400 border-blue-100 bg-blue-100" />}
+          {editModes.ticket && <AddButton onClick={() => handleOpenModal('ticket')} />}
         </section>
 
-        {/* Restaurants Section */}
         <section id="restaurants-section" className="scroll-mt-20 bg-white rounded-3xl p-4 border border-slate-200 shadow-sm space-y-4">
           <div className="flex justify-between items-center px-1">
             <h2 className="text-lg font-bold flex items-center gap-2">
@@ -627,12 +633,10 @@ const BookingView: React.FC<BookingViewProps> = ({
                 className={`bg-slate-50 rounded-[2rem] p-4 border border-slate-100 relative transition-all ${editModes.restaurant ? 'pr-12 opacity-90 cursor-pointer hover:border-blue-400 hover:bg-blue-50/30' : ''}`}
               >
                 {renderCardControls('restaurant', i, i === 0, i === restaurants.length - 1)}
-                
                 <div className="flex justify-between items-center mb-3 px-1">
                   <span className="text-base font-bold text-slate-900 truncate flex-1 pr-4">{r.name}</span>
                   <span className="text-[10px] font-bold bg-white text-blue-600 px-3 py-1 rounded-full border border-blue-100 shrink-0">{r.date}</span>
                 </div>
-
                 <div className="bg-white border border-blue-100/30 rounded-2xl p-4 shadow-sm">
                   <div className="flex items-start gap-4">
                     <div className="p-3 bg-blue-50 rounded-2xl text-blue-500 shrink-0">
@@ -667,7 +671,6 @@ const BookingView: React.FC<BookingViewProps> = ({
                     </div>
                   </div>
                 </div>
-
                 {r.note && (
                   <div className="mt-3 py-2 px-3 bg-blue-50/50 rounded-xl text-[10px] text-blue-700 flex gap-2 whitespace-pre-line border border-blue-100/30">
                     <span className="shrink-0 mt-0.5 text-blue-400"><Info size={12} /></span>
@@ -676,12 +679,11 @@ const BookingView: React.FC<BookingViewProps> = ({
                 )}
               </div>
             ))}
-            {editModes.restaurant && <AddButton onClick={() => handleOpenModal('restaurant')} colorClass="text-blue-400 border-blue-100 bg-blue-100" />}
+            {editModes.restaurant && <AddButton onClick={() => handleOpenModal('restaurant')} />}
           </div>
         </section>
       </div>
 
-      {/* 刪除確認彈窗 */}
       {itemToDelete && (
         <div className="fixed inset-0 z-[250] flex items-center justify-center px-6">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setItemToDelete(null)}></div>
@@ -709,7 +711,6 @@ const BookingView: React.FC<BookingViewProps> = ({
         </div>
       )}
 
-      {/* Data Entry Modal */}
       {modalType && (
         <div className="fixed inset-0 z-[100] flex items-end justify-center px-4 pb-4">
           <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => { setModalType(null); setEditingIndex(null); }}></div>
@@ -721,7 +722,6 @@ const BookingView: React.FC<BookingViewProps> = ({
                 </h3>
                 <button onClick={() => { setModalType(null); setEditingIndex(null); }} className="p-2 bg-slate-100 rounded-full text-slate-400"><X size={20} /></button>
               </div>
-
               <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2 hide-scrollbar">
                 {modalType === 'flight' && (
                   <>
@@ -745,11 +745,16 @@ const BookingView: React.FC<BookingViewProps> = ({
                         <input placeholder="NRT" value={formData.to} onChange={e => setFormData({...formData, to: e.target.value})} className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500" />
                       </div>
                     </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Baggage</label>
-                      <input placeholder="例如：23kg x 1" value={formData.baggage} onChange={e => setFormData({...formData, baggage: e.target.value})} className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500" />
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">交通時間</label>
+                        <input placeholder="例如：3小時15分" value={formData.duration} onChange={e => setFormData({...formData, duration: e.target.value})} className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500" />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Baggage</label>
+                        <input placeholder="例如：23kg x 1" value={formData.baggage} onChange={e => setFormData({...formData, baggage: e.target.value})} className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500" />
+                      </div>
                     </div>
-                    
                     <div className="space-y-2 mt-2">
                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Seat 分配</label>
                        {members.map(m => (
@@ -781,11 +786,7 @@ const BookingView: React.FC<BookingViewProps> = ({
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">交通工具類型</label>
-                        <select 
-                          value={formData.type} 
-                          onChange={e => setFormData({...formData, type: e.target.value})} 
-                          className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-blue-500 appearance-none"
-                        >
+                        <select value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})} className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-blue-500 appearance-none">
                           {TRANSPORT_TYPES.map(type => <option key={type} value={type}>{type}</option>)}
                         </select>
                       </div>
@@ -794,12 +795,10 @@ const BookingView: React.FC<BookingViewProps> = ({
                         <input placeholder="NOZOMI 233" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-blue-500" />
                       </div>
                     </div>
-
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">日期</label>
                       <input placeholder="2026/03/06" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-blue-500" />
                     </div>
-
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">出發地</label>
@@ -810,82 +809,43 @@ const BookingView: React.FC<BookingViewProps> = ({
                         <input placeholder="名古屋" value={formData.to} onChange={e => setFormData({...formData, to: e.target.value})} className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500" />
                       </div>
                     </div>
-
                     <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">出發時間</label>
-                        <input type="time" value={formData.departureTime} onChange={e => setFormData({...formData, departureTime: e.target.value})} className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-blue-600" />
+                      <div className="space-y-4">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">出發時間</label>
+                          <input type="time" value={formData.departureTime} onChange={e => setFormData({...formData, departureTime: e.target.value})} className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-blue-600" />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">交通時間</label>
+                          <input placeholder="例如：50分" value={formData.duration} onChange={e => setFormData({...formData, duration: e.target.value})} className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-blue-600" />
+                        </div>
                       </div>
                       <div className="space-y-1">
                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">抵達時間</label>
                         <input type="time" value={formData.arrivalTime} onChange={e => setFormData({...formData, arrivalTime: e.target.value})} className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-blue-600" />
                       </div>
                     </div>
-
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">票價</label>
                       <div className="flex gap-2">
                         <div className="flex bg-slate-100 p-1 rounded-2xl shrink-0">
-                          <button 
-                            type="button"
-                            onClick={() => setFormData({...formData, currency: 'JPY'})}
-                            className={`px-3 py-1 text-[10px] font-black rounded-xl transition-all ${formData.currency === 'JPY' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400'}`}
-                          >
-                            JPY
-                          </button>
-                          <button 
-                            type="button"
-                            onClick={() => setFormData({...formData, currency: 'TWD'})}
-                            className={`px-3 py-1 text-[10px] font-black rounded-xl transition-all ${formData.currency === 'TWD' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400'}`}
-                          >
-                            TWD
-                          </button>
+                          <button type="button" onClick={() => setFormData({...formData, currency: 'JPY'})} className={`px-3 py-1 text-[10px] font-black rounded-xl transition-all ${formData.currency === 'JPY' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400'}`}>JPY</button>
+                          <button type="button" onClick={() => setFormData({...formData, currency: 'TWD'})} className={`px-3 py-1 text-[10px] font-black rounded-xl transition-all ${formData.currency === 'TWD' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400'}`}>TWD</button>
                         </div>
-                        <input 
-                          type="number" 
-                          placeholder="0" 
-                          value={formData.price || ''} 
-                          onChange={e => setFormData({...formData, price: Number(e.target.value)})} 
-                          className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm font-black focus:ring-2 focus:ring-blue-600" 
-                        />
+                        <input type="number" placeholder="0" value={formData.price || ''} onChange={e => setFormData({...formData, price: Number(e.target.value)})} className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm font-black focus:ring-2 focus:ring-blue-600" />
                       </div>
                     </div>
-                    
                     <div className="space-y-2 mt-2">
                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">每人 Seat 分配</label>
                        {members.map(m => (
                          <div key={m.id} className="bg-slate-50 p-3 rounded-2xl space-y-2">
                             <div className="flex items-center gap-2">
-                              <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-white text-[9px] font-bold shrink-0 ${m.color}`}>
-                                {m.name.charAt(0)}
-                              </div>
+                              <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-white text-[9px] font-bold shrink-0 ${m.color}`}>{m.name.charAt(0)}</div>
                               <span className="text-xs font-bold text-slate-600">{m.name}</span>
                             </div>
                             <div className="grid grid-cols-2 gap-2">
-                              <input 
-                                placeholder="類型 (指定席)" 
-                                value={formData.memberSeats?.[m.id]?.type || ''} 
-                                onChange={e => setFormData({
-                                  ...formData, 
-                                  memberSeats: { 
-                                    ...formData.memberSeats, 
-                                    [m.id]: { ...(formData.memberSeats?.[m.id] || {}), type: e.target.value }
-                                  }
-                                })} 
-                                className="w-full bg-white border border-slate-100 rounded-xl px-3 py-2 text-[11px] focus:ring-2 focus:ring-blue-500"
-                              />
-                              <input 
-                                placeholder="座號 (6車 12-A)" 
-                                value={formData.memberSeats?.[m.id]?.seat || ''} 
-                                onChange={e => setFormData({
-                                  ...formData, 
-                                  memberSeats: { 
-                                    ...formData.memberSeats, 
-                                    [m.id]: { ...(formData.memberSeats?.[m.id] || {}), seat: e.target.value }
-                                  }
-                                })} 
-                                className="w-full bg-white border border-slate-100 rounded-xl px-3 py-2 text-[11px] focus:ring-2 focus:ring-blue-500"
-                              />
+                              <input placeholder="類型 (指定席)" value={formData.memberSeats?.[m.id]?.type || ''} onChange={e => setFormData({...formData, memberSeats: { ...formData.memberSeats, [m.id]: { ...(formData.memberSeats?.[m.id] || {}), type: e.target.value }}})} className="w-full bg-white border border-slate-100 rounded-xl px-3 py-2 text-[11px] focus:ring-2 focus:ring-blue-500" />
+                              <input placeholder="座號 (6車 12-A)" value={formData.memberSeats?.[m.id]?.seat || ''} onChange={e => setFormData({...formData, memberSeats: { ...formData.memberSeats, [m.id]: { ...(formData.memberSeats?.[m.id] || {}), seat: e.target.value }}})} className="w-full bg-white border border-slate-100 rounded-xl px-3 py-2 text-[11px] focus:ring-2 focus:ring-blue-500" />
                             </div>
                          </div>
                        ))}
@@ -900,16 +860,11 @@ const BookingView: React.FC<BookingViewProps> = ({
                   <>
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">飯店照片</label>
-                      <div 
-                        onClick={() => fileInputRef.current?.click()} 
-                        className="w-full aspect-video bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl flex flex-col items-center justify-center cursor-pointer hover:bg-slate-100 transition-colors relative overflow-hidden"
-                      >
+                      <div onClick={() => fileInputRef.current?.click()} className="w-full aspect-video bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl flex flex-col items-center justify-center cursor-pointer hover:bg-slate-100 transition-colors relative overflow-hidden">
                         {formData.image ? (
                           <>
                             <img src={formData.image} className="w-full h-full object-cover" alt="Hotel preview" />
-                            <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
-                              <Camera className="text-white" size={32} />
-                            </div>
+                            <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity"><Camera className="text-white" size={32} /></div>
                           </>
                         ) : (
                           <>
@@ -940,12 +895,7 @@ const BookingView: React.FC<BookingViewProps> = ({
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">備註 / 注意事項</label>
-                      <textarea 
-                        placeholder="例如：需現場支付住宿稅、下午三點後進房..." 
-                        value={formData.note} 
-                        onChange={e => setFormData({...formData, note: e.target.value})} 
-                        className="w-full h-24 bg-slate-50 border-none rounded-2xl p-4 text-sm font-medium focus:ring-2 focus:ring-blue-500 resize-none" 
-                      />
+                      <textarea placeholder="例如：需現場支付住宿稅、下午三點後進房..." value={formData.note} onChange={e => setFormData({...formData, note: e.target.value})} className="w-full h-24 bg-slate-50 border-none rounded-2xl p-4 text-sm font-medium focus:ring-2 focus:ring-blue-500 resize-none" />
                     </div>
                   </>
                 )}
@@ -955,27 +905,16 @@ const BookingView: React.FC<BookingViewProps> = ({
                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">票券名稱 / 活動</label>
                       <input placeholder="例如：WBC 球賽" value={formData.event} onChange={e => setFormData({...formData, event: e.target.value})} className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500" />
                     </div>
-                    
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">選擇圖示</label>
                       <div className="flex gap-2 overflow-x-auto py-2 hide-scrollbar">
                         {TICKET_ICONS.map((iconItem) => (
-                          <button
-                            key={iconItem.type}
-                            onClick={() => setFormData({ ...formData, iconType: iconItem.type })}
-                            className={`flex flex-col items-center gap-1 shrink-0 p-3 rounded-2xl transition-all border ${
-                              formData.iconType === iconItem.type 
-                                ? 'bg-blue-50 border-blue-200 text-blue-600 ring-2 ring-blue-100' 
-                                : 'bg-slate-50 border-slate-100 text-slate-400'
-                            }`}
-                          >
-                            <iconItem.icon size={20} />
-                            <span className="text-[9px] font-bold">{iconItem.label}</span>
+                          <button key={iconItem.type} onClick={() => setFormData({ ...formData, iconType: iconItem.type })} className={`flex flex-col items-center gap-1 shrink-0 p-3 rounded-2xl transition-all border ${formData.iconType === iconItem.type ? 'bg-blue-50 border-blue-200 text-blue-600 ring-2 ring-blue-100' : 'bg-slate-50 border-slate-100 text-slate-400'}`}>
+                            <iconItem.icon size={20} /><span className="text-[9px] font-bold">{iconItem.label}</span>
                           </button>
                         ))}
                       </div>
                     </div>
-
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">隊伍 / 內容</label>
                       <input placeholder="例如：台灣 vs 日本" value={formData.teams} onChange={e => setFormData({...formData, teams: e.target.value})} className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500" />
@@ -991,80 +930,37 @@ const BookingView: React.FC<BookingViewProps> = ({
                       </div>
                     </div>
                     <div className="grid grid-cols-3 gap-3">
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Section</label>
-                        <input placeholder="A44" value={formData.section} onChange={e => setFormData({...formData, section: e.target.value})} className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500" />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Row</label>
-                        <input placeholder="14" value={formData.row} onChange={e => setFormData({...formData, row: e.target.value})} className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500" />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Seat</label>
-                        <input placeholder="389" value={formData.seat} onChange={e => setFormData({...formData, seat: e.target.value})} className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500" />
-                      </div>
+                      <div className="space-y-1"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Section</label><input placeholder="A44" value={formData.section} onChange={e => setFormData({...formData, section: e.target.value})} className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500" /></div>
+                      <div className="space-y-1"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Row</label><input placeholder="14" value={formData.row} onChange={e => setFormData({...formData, row: e.target.value})} className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500" /></div>
+                      <div className="space-y-1"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Seat</label><input placeholder="389" value={formData.seat} onChange={e => setFormData({...formData, seat: e.target.value})} className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500" /></div>
                     </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">地點</label>
-                      <input placeholder="例如：東京巨蛋" value={formData.location} onChange={e => setFormData({...formData, location: e.target.value})} className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500" />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">其他備註</label>
-                      <input placeholder="例如：Gate 21" value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500" />
-                    </div>
+                    <div className="space-y-1"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">地點</label><input placeholder="例如：東京巨蛋" value={formData.location} onChange={e => setFormData({...formData, location: e.target.value})} className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500" /></div>
+                    <div className="space-y-1"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">其他備註</label><input placeholder="例如：Gate 21" value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500" /></div>
                   </>
                 )}
                 {modalType === 'restaurant' && (
                   <>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">餐廳名稱</label>
-                      <input placeholder="例如：Peter Luger Steak House" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500" />
-                    </div>
+                    <div className="space-y-1"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">餐廳名稱</label><input placeholder="例如：Peter Luger Steak House" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500" /></div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">類別圖示</label>
                       <div className="flex gap-2 overflow-x-auto py-2 hide-scrollbar">
                         {RESTAURANT_ICONS.map((iconItem) => (
-                          <button
-                            key={iconItem.type}
-                            onClick={() => setFormData({ ...formData, iconType: iconItem.type })}
-                            className={`flex flex-col items-center gap-1 shrink-0 p-3 rounded-2xl transition-all border ${
-                              formData.iconType === iconItem.type 
-                                ? 'bg-blue-50 border-blue-200 text-blue-600 ring-2 ring-blue-100' 
-                                : 'bg-slate-50 border-slate-100 text-slate-400'
-                            }`}
-                          >
-                            <iconItem.icon size={20} />
-                            <span className="text-[9px] font-bold">{iconItem.label}</span>
+                          <button key={iconItem.type} onClick={() => setFormData({ ...formData, iconType: iconItem.type })} className={`flex flex-col items-center gap-1 shrink-0 p-3 rounded-2xl transition-all border ${formData.iconType === iconItem.type ? 'bg-blue-50 border-blue-200 text-blue-600 ring-2 ring-blue-100' : 'bg-slate-50 border-slate-100 text-slate-400'}`}>
+                            <iconItem.icon size={20} /><span className="text-[9px] font-bold">{iconItem.label}</span>
                           </button>
                         ))}
                       </div>
                     </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">地址</label>
-                      <input placeholder="餐廳完整地址" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500" />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">預約餐點 (選填)</label>
-                      <input placeholder="例如：平日午間套餐*2" value={formData.reservedDishes} onChange={e => setFormData({...formData, reservedDishes: e.target.value})} className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500" />
-                    </div>
+                    <div className="space-y-1"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">地址</label><input placeholder="餐廳完整地址" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500" /></div>
+                    <div className="space-y-1"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">預約餐點 (選填)</label><input placeholder="例如：平日午間套餐*2" value={formData.reservedDishes} onChange={e => setFormData({...formData, reservedDishes: e.target.value})} className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500" /></div>
                     <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">日期</label>
-                        <input placeholder="2026/03/06" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500" />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">時間</label>
-                        <input placeholder="13:15" value={formData.time} onChange={e => setFormData({...formData, time: e.target.value})} className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500" />
-                      </div>
+                      <div className="space-y-1"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">日期</label><input placeholder="2026/03/06" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500" /></div>
+                      <div className="space-y-1"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">時間</label><input placeholder="13:15" value={formData.time} onChange={e => setFormData({...formData, time: e.target.value})} className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500" /></div>
                     </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">備註 (如預約內容)</label>
-                      <textarea placeholder="例如：不收現金" value={formData.note} onChange={e => setFormData({...formData, note: e.target.value})} className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 h-24" />
-                    </div>
+                    <div className="space-y-1"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">備註 (如預約內容)</label><textarea placeholder="例如：不收現金" value={formData.note} onChange={e => setFormData({...formData, note: e.target.value})} className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 h-24" /></div>
                   </>
                 )}
               </div>
-
               <div className="mt-8 flex gap-3">
                 <button onClick={() => { setModalType(null); setEditingIndex(null); }} className="flex-1 py-4 bg-slate-100 rounded-2xl font-bold text-slate-500 active:scale-95 transition-all">取消</button>
                 <button onClick={handleSave} className="flex-1 py-4 bg-blue-600 rounded-2xl font-bold text-white shadow-lg shadow-blue-200 active:scale-95 transition-all flex items-center justify-center gap-2">

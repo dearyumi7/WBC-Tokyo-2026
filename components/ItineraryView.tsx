@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef, useMemo } from 'https://esm.sh/react@19.2.3';
-// Add Calendar as CalendarIcon to the imports from lucide-react
 import { MapPin, Navigation, Plus, Sun, Cloud, Clock, Wind, Edit3, Check, X, Info, Trash2, Train, Bus, Car, Plane, Footprints, ChevronRight, ArrowRight, ChevronDown, ChevronUp, StickyNote, DollarSign, GripVertical, History, Utensils, ShoppingBag, Map as MapIcon, Loader2, ArrowLeft, BookOpen, Settings, ListPlus, Bold, Italic, Type, Palette, Minus, ExternalLink, Link, Image, Search, AlertTriangle, Calendar as CalendarIcon } from 'https://esm.sh/lucide-react@0.563.0';
 import { Transport, TransportTransfer, ScheduleItem, CustomDetail } from '../types.ts';
 
@@ -10,6 +9,28 @@ interface RichTextEditorProps {
   initialValue: string;
   onChange: (html: string) => void;
 }
+
+const compressImage = (base64Str: string, maxWidth = 60): Promise<string> => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.src = base64Str;
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let width = img.width;
+      let height = img.height;
+      if (width > maxWidth) {
+        height = (height * maxWidth) / width;
+        width = maxWidth;
+      }
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx?.drawImage(img, 0, 0, width, height);
+      // 行程圖片極限壓縮品質 0.01 (Firestore 1MB 限制)
+      resolve(canvas.toDataURL('image/jpeg', 0.01));
+    };
+  });
+};
 
 const RichTextEditor: React.FC<RichTextEditorProps> = ({ initialValue, onChange }) => {
   const editorRef = useRef<HTMLDivElement>(null);
@@ -55,10 +76,11 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ initialValue, onChange 
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onload = (event) => {
+      reader.onload = async (event) => {
         const base64 = event.target?.result as string;
+        const compressed = await compressImage(base64);
         restoreSelection();
-        const imgHtml = `<div style="margin: 12px 0;"><img src="${base64}" style="max-width: 100%; height: auto; border-radius: 12px; display: block;" /></div><br>`;
+        const imgHtml = `<div style="margin: 12px 0;"><img src="${compressed}" style="max-width: 100%; height: auto; border-radius: 12px; display: block;" /></div><br>`;
         document.execCommand('insertHTML', false, imgHtml);
         handleInput();
       };
@@ -239,6 +261,7 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
         icon: w.icon,
         condition: w.condition
       });
+      // FIX: Use current.getDate() instead of current.setDate() as the argument for incrementing the date.
       current.setDate(current.getDate() + 1);
       count++;
     }
@@ -726,11 +749,12 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
               <div 
                 key={item.id} 
                 data-id={item.id}
-                className={`itinerary-item-row relative flex flex-col gap-3 group transition-opacity ${draggedItemId === item.id ? 'opacity-40 grayscale scale-95' : ''}`}
+                className={`itinerary-item-row relative flex flex-col gap-3 group transition-opacity ${draggedItemId === item.id ? 'opacity-40 grayscale scale-95' : ''} ${isEditMode ? 'select-none' : ''}`}
                 draggable={isEditMode}
                 onDragStart={(e) => handleDragStart(e, item.id)}
                 onDragOver={handleDragOver}
                 onDrop={(e) => handleDrop(e, item.id)}
+                style={isEditMode ? { userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none' } : {}}
               >
                 <div className="flex gap-6">
                   <div className={`w-4 h-4 rounded-full border-2 border-white shadow-sm shrink-0 z-10 mt-1.5 transition-colors duration-300 ${
@@ -741,8 +765,11 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
                     className={`flex-1 bg-white p-4 rounded-3xl shadow-sm border border-slate-100 transition-all relative ${isEditMode ? 'border-blue-400 ring-2 ring-blue-50' : (hasDetails ? 'hover:border-blue-400 hover:shadow-md cursor-pointer' : '')}`}
                   >
                     {isEditMode && (
-                      <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-3 text-slate-300">
-                        <GripVertical size={16} />
+                      <div 
+                        className="absolute left-0 top-0 bottom-0 w-12 flex items-center justify-center -translate-x-8 text-slate-300 active:text-blue-500 transition-colors z-20 cursor-grab active:cursor-grabbing touch-none"
+                        style={{ touchAction: 'none', WebkitTouchCallout: 'none', userSelect: 'none', WebkitUserSelect: 'none' }}
+                      >
+                        <GripVertical size={22} strokeWidth={2.5} />
                       </div>
                     )}
                     {isEditMode && (
@@ -754,8 +781,8 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
                     )}
                     
                     <div className="flex justify-between items-start mb-2">
-                      <div className="flex items-center gap-1.5 text-xs font-bold text-blue-600">
-                        <Clock size={12} /> {item.time}
+                      <div className="flex items-center gap-1.5 text-base font-black text-blue-600">
+                        <Clock size={14} /> {item.time}
                       </div>
                       {!isEditMode && <Navigation size={16} className="text-slate-300" />}
                     </div>
@@ -763,7 +790,7 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
                       <h3 className="font-bold text-lg">{item.event}</h3>
                       {!isEditMode && hasDetails && (
                         <div className="text-[10px] bg-blue-50 text-blue-500 px-2 py-0.5 rounded font-black flex items-center gap-1">
-                          <BookOpen size={10} /> 詳情
+                          < BookOpen size={10} /> 詳情
                         </div>
                       )}
                     </div>
@@ -985,7 +1012,7 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
                     updateDoc(tripRef, { scheduleItems: newList });
                   }
                 }} 
-                className="w-full py-4 bg-red-500 text-white rounded-2xl font-bold shadow-lg shadow-red-100 active:scale-95 transition-all"
+                className="w-full py-4 bg-red-500 text-white rounded-2xl font-bold shadow-lg shadow-blue-100 active:scale-95 transition-all"
               >
                 確認移除
               </button>
@@ -1017,7 +1044,7 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
               <section key={detail.id} className="space-y-4">
                 <div className="flex items-center gap-3">
                   <div className="p-2.5 bg-blue-50 rounded-2xl text-blue-600">
-                    <BookOpen size={20} />
+                    < BookOpen size={20} />
                   </div>
                   <h2 className="text-lg font-black text-slate-800">{detail.title || '無標題'}</h2>
                 </div>
@@ -1033,7 +1060,7 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
       {isModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-end justify-center px-4 pb-4">
           <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setIsModalOpen(false)}></div>
-          <div className="relative w-full max-w-lg bg-white rounded-[2.5rem] shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-300">
+          <div className="relative w-full max-lg bg-white rounded-[2.5rem] shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-300">
             <div className="p-6">
               <div className="flex justify-between items-center mb-6 px-1">
                 <h3 className="text-xl font-black flex items-center gap-2">
@@ -1317,12 +1344,14 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
                   <div className="flex gap-2">
                     <div className="flex bg-slate-100 p-1 rounded-2xl shrink-0">
                       <button 
+                        type="button"
                         onClick={() => setTransportFormData({...transportFormData, currency: 'JPY'})}
                         className={`px-3 py-1 text-[10px] font-black rounded-xl transition-all ${transportFormData.currency === 'JPY' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400'}`}
                       >
                         JPY
                       </button>
                       <button 
+                        type="button"
                         onClick={() => setTransportFormData({...transportFormData, currency: 'TWD'})}
                         className={`px-3 py-1 text-[10px] font-black rounded-xl transition-all ${transportFormData.currency === 'TWD' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400'}`}
                       >
@@ -1341,23 +1370,24 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
 
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">備註</label>
-                  <textarea placeholder="轉乘資訊、月台或出口建議..." value={transportFormData.note} onChange={e => setTransportFormData({...transportFormData, note: e.target.value})} className="w-full h-20 bg-slate-50 border-none rounded-2xl p-4 text-sm font-medium focus:ring-2 focus:ring-blue-600 resize-none" />
+                  <textarea 
+                    placeholder="例如：請將行李置於座位後方" 
+                    value={transportFormData.note || ''} 
+                    onChange={e => setTransportFormData({...transportFormData, note: e.target.value})} 
+                    className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-600 h-24 resize-none" 
+                  />
                 </div>
               </div>
 
               <div className="mt-8 flex gap-3">
-                {activeTransportItem?.plannedTransport && (
-                  <button 
-                    onClick={() => setIsTransportDeleteConfirmOpen(true)} 
-                    className="px-4 py-4 bg-red-50 text-red-500 rounded-2xl font-bold active:scale-95 transition-all"
-                  >
-                    <Trash2 size={20} />
-                  </button>
-                )}
-                <button onClick={() => setIsTransportModalOpen(false)} className="flex-1 py-4 bg-slate-100 rounded-2xl font-bold text-slate-500 active:scale-95 transition-all">取消</button>
-                <button onClick={handleSaveTransport} className="flex-[2] py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 active:scale-95 transition-all flex items-center justify-center gap-2">
-                  <Check size={18} /> 儲存交通
+                <button 
+                  onClick={() => setIsTransportDeleteConfirmOpen(true)} 
+                  className="p-4 bg-red-50 text-red-500 rounded-2xl font-bold active:scale-95 transition-all"
+                >
+                  <Trash2 size={20} />
                 </button>
+                <button onClick={() => setIsTransportModalOpen(false)} className="flex-1 py-4 bg-slate-100 rounded-2xl font-bold text-slate-500 active:scale-95 transition-all">取消</button>
+                <button onClick={handleSaveTransport} className="flex-1 py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 active:scale-95 transition-all flex items-center justify-center gap-2"><Check size={18} /> 儲存規劃</button>
               </div>
             </div>
           </div>
@@ -1367,48 +1397,26 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
       {isNoteModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-end justify-center px-4 pb-4">
           <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setIsNoteModalOpen(false)}></div>
-          <div className="relative w-full max-sm bg-white rounded-[2.5rem] shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-300">
+          <div className="relative w-full max-lg bg-white rounded-[2.5rem] shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-300">
             <div className="p-6">
               <div className="flex justify-between items-center mb-6 px-1">
                 <h3 className="text-xl font-black flex items-center gap-2">
-                  <div className="p-2 bg-slate-50 rounded-xl text-slate-600"><StickyNote size={20} /></div>
-                  行程備註
+                  <div className="p-2 bg-slate-100 rounded-xl text-slate-600"><StickyNote size={20} /></div>
+                  自訂備註
                 </h3>
                 <button onClick={() => setIsNoteModalOpen(false)} className="p-2 bg-slate-100 rounded-full text-slate-400 hover:bg-slate-200 transition-colors"><X size={20} /></button>
               </div>
-
-              <div className="space-y-4 pr-1 hide-scrollbar">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">備註內容</label>
-                  <textarea 
-                    placeholder="填寫此行程的注意事項、必買商品 or 提醒..." 
-                    value={noteFormData} 
-                    onChange={e => setNoteFormData(e.target.value)} 
-                    className="w-full h-40 bg-slate-50 border-none rounded-2xl p-5 text-sm font-bold focus:ring-2 focus:ring-slate-500 resize-none" 
-                  />
-                </div>
+              <div className="space-y-4">
+                <textarea 
+                  placeholder="輸入備註內容..." 
+                  value={noteFormData} 
+                  onChange={e => setNoteFormData(e.target.value)} 
+                  className="w-full h-40 bg-slate-50 border-none rounded-2xl p-5 text-sm font-bold focus:ring-2 focus:ring-blue-600 resize-none" 
+                />
               </div>
-
               <div className="mt-8 flex gap-3">
-                {activeNoteItem?.customNote && (
-                  <button 
-                    onClick={() => {
-                      if (window.confirm('確定要移除此備註嗎？')) {
-                        setNoteFormData('');
-                        const newList = scheduleItems.map(item => item.id === activeNoteItem?.id ? { ...item, customNote: null } : item);
-                        setScheduleItems(newList);
-                        setIsNoteModalOpen(false);
-                        const tripRef = doc(db, 'trips', 'main_trip_data');
-                        updateDoc(tripRef, { scheduleItems: newList });
-                      }
-                    }} 
-                    className="px-4 py-4 bg-red-50 text-red-500 rounded-2xl font-bold active:scale-95 transition-all"
-                  >
-                    <Trash2 size={20} />
-                  </button>
-                )}
                 <button onClick={() => setIsNoteModalOpen(false)} className="flex-1 py-4 bg-slate-100 rounded-2xl font-bold text-slate-500 active:scale-95 transition-all">取消</button>
-                <button onClick={handleSaveNote} className="flex-[2] py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 active:scale-95 transition-all flex items-center justify-center gap-2">
+                <button onClick={handleSaveNote} className="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-bold shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2">
                   <Check size={18} /> 儲存備註
                 </button>
               </div>

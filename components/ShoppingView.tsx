@@ -18,6 +18,28 @@ const CATEGORIES = [
   { id: '其他', label: '其他', color: 'bg-slate-100 text-slate-600' },
 ];
 
+const compressImage = (base64Str: string, maxWidth = 30): Promise<string> => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.src = base64Str;
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let width = img.width;
+      let height = img.height;
+      if (width > maxWidth) {
+        height = (height * maxWidth) / width;
+        width = maxWidth;
+      }
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx?.drawImage(img, 0, 0, width, height);
+      // 極限壓縮 0.01 (Firestore 1MB 限制)
+      resolve(canvas.toDataURL('image/jpeg', 0.01));
+    };
+  });
+};
+
 const ShoppingView: React.FC<ShoppingViewProps> = ({ items, setItems, members, isEditable, activeCurrencies }) => {
   const [activeSubTab, setActiveSubTab] = useState<'list' | 'stats'>('list');
   const [activeMemberId, setActiveMemberId] = useState<string | null>(members[0]?.id || null);
@@ -95,8 +117,9 @@ const ShoppingView: React.FC<ShoppingViewProps> = ({ items, setItems, members, i
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setFormData(prev => ({ ...prev, image: reader.result as string }));
+      reader.onloadend = async () => {
+        const compressed = await compressImage(reader.result as string);
+        setFormData(prev => ({ ...prev, image: compressed }));
       };
       reader.readAsDataURL(file);
     }
@@ -224,8 +247,6 @@ const ShoppingView: React.FC<ShoppingViewProps> = ({ items, setItems, members, i
     if (!isEditMode) return;
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', id);
-    // Use setTimeout to delay setting the ID. This ensures the browser captures
-    // the opaque element for the drag ghost before the dimming style is applied.
     setTimeout(() => setDraggedItemId(id), 0);
   };
 
@@ -542,7 +563,7 @@ const ShoppingView: React.FC<ShoppingViewProps> = ({ items, setItems, members, i
                   
                   <div className="grid grid-cols-2 gap-4">
                     <div className="bg-slate-50 p-4 rounded-3xl border border-slate-100">
-                      <p className="text-[10px] text-slate-400 font-bold mb-1 uppercase tracking-tight">日幣合計</p>
+                      <p className="text-[10px] text-slate-400 font-bold mb-1 uppercase tracking-tight">橫跨日幣合計</p>
                       <p className="text-lg font-bold text-slate-800">¥ {stats.totalJpy.toLocaleString()}</p>
                     </div>
                     <div className="bg-slate-50 p-4 rounded-3xl border border-slate-100">
@@ -630,7 +651,7 @@ const ShoppingView: React.FC<ShoppingViewProps> = ({ items, setItems, members, i
               <h3 className="text-xl font-black text-slate-800 mb-2">確定要刪除嗎？</h3>
               <p className="text-sm text-slate-500 font-medium mb-8 leading-relaxed">「{items.find(i => i.id === itemToDelete)?.name}」刪除後將無法復原。</p>
               <div className="flex flex-col gap-3">
-                <button onClick={confirmDelete} className="w-full py-4 bg-red-500 text-white rounded-2xl font-bold shadow-lg shadow-red-100 active:scale-95 transition-all">確定刪除</button>
+                <button onClick={confirmDelete} className="w-full py-4 bg-red-500 text-white rounded-2xl font-bold shadow-lg shadow-blue-100 active:scale-95 transition-all">確定刪除</button>
                 <button onClick={() => setItemToDelete(null)} className="w-full py-4 bg-slate-100 text-slate-500 rounded-2xl font-bold active:scale-95 transition-all">取消</button>
               </div>
             </div>
@@ -752,7 +773,7 @@ const ShoppingView: React.FC<ShoppingViewProps> = ({ items, setItems, members, i
                       </div>
                       
                       {activeCurrencies.length > 2 && (
-                        <div className="flex gap-2 overflow-x-auto py-1">
+                        <div className="flex gap-2 overflow-x-auto py-1 hide-scrollbar">
                            {activeCurrencies.filter(c => c !== 'JPY' && c !== 'TWD').map(c => (
                              <button
                                key={c}
@@ -769,7 +790,7 @@ const ShoppingView: React.FC<ShoppingViewProps> = ({ items, setItems, members, i
                   )}
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">備註</label>
-                    <textarea placeholder="填寫細節、尺寸或備註..." value={formData.note} onChange={e => setFormData(prev => ({...prev, note: e.target.value}))} className="w-full h-24 bg-slate-50 border-none rounded-2xl p-4 text-sm font-medium focus:ring-2 focus:ring-blue-600 resize-none" />
+                    <textarea placeholder="填寫細節、尺寸 or 備註..." value={formData.note} onChange={e => setFormData(prev => ({...prev, note: e.target.value}))} className="w-full h-24 bg-slate-50 border-none rounded-2xl p-4 text-sm font-medium focus:ring-2 focus:ring-blue-600 resize-none" />
                   </div>
                 </div>
                 <div className="mt-8 flex gap-3">

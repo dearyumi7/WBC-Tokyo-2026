@@ -1,13 +1,17 @@
-import { GoogleGenAI, Type } from "https://esm.sh/@google/genai@1.38.0";
+
+// Use correct import as per guidelines
+import { GoogleGenAI, Type } from "@google/genai";
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
+// Get travel suggestions using Gemini
 export const getTravelSuggestions = async (prompt: string) => {
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `You are a Tokyo travel expert. A user is going to Tokyo for the WBC. ${prompt}. Give a concise suggestion in Traditional Chinese.`,
     });
+    // Access .text property directly
     return response.text;
   } catch (error) {
     console.error("Gemini Error:", error);
@@ -15,6 +19,7 @@ export const getTravelSuggestions = async (prompt: string) => {
   }
 };
 
+// Mock weather function
 export const getWeather = async (date: string) => {
   return {
     temp: Math.floor(Math.random() * (15 - 5 + 1)) + 5,
@@ -29,6 +34,7 @@ export interface SpotDetail {
   souvenirs: string[];
 }
 
+// Get spot details using Gemini with JSON response schema
 export const getSpotDetails = async (spotName: string, address: string): Promise<SpotDetail | null> => {
   try {
     const response = await ai.models.generateContent({
@@ -67,7 +73,10 @@ export const getSpotDetails = async (spotName: string, address: string): Promise
       }
     });
 
-    return JSON.parse(response.text);
+    // Access .text property directly and parse JSON
+    const text = response.text;
+    if (!text) return null;
+    return JSON.parse(text);
   } catch (error) {
     console.error("Gemini Detail Error:", error);
     return null;
