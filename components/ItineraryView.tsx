@@ -261,7 +261,6 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
         icon: w.icon,
         condition: w.condition
       });
-      // FIX: Use current.getDate() instead of current.setDate() as the argument for incrementing the date.
       current.setDate(current.getDate() + 1);
       count++;
     }
@@ -754,7 +753,7 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
                 onDragStart={(e) => handleDragStart(e, item.id)}
                 onDragOver={handleDragOver}
                 onDrop={(e) => handleDrop(e, item.id)}
-                style={isEditMode ? { userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none' } : {}}
+                onDragEnd={() => setDraggedItemId(null)}
               >
                 <div className="flex gap-6">
                   <div className={`w-4 h-4 rounded-full border-2 border-white shadow-sm shrink-0 z-10 mt-1.5 transition-colors duration-300 ${
@@ -762,19 +761,16 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ transports = [], startDat
                   }`}></div>
                   <div 
                     onClick={() => isEditMode ? handleEditItem(item) : handleOpenSpotDetail(item)}
-                    className={`flex-1 bg-white p-4 rounded-3xl shadow-sm border border-slate-100 transition-all relative ${isEditMode ? 'border-blue-400 ring-2 ring-blue-50' : (hasDetails ? 'hover:border-blue-400 hover:shadow-md cursor-pointer' : '')}`}
+                    className={`flex-1 bg-white p-4 rounded-3xl shadow-sm border border-slate-100 transition-all relative ${isEditMode ? 'border-blue-400 ring-2 ring-blue-50 cursor-grab active:cursor-grabbing' : (hasDetails ? 'hover:border-blue-400 hover:shadow-md cursor-pointer' : '')}`}
                   >
                     {isEditMode && (
-                      <div 
-                        className="absolute left-0 top-0 bottom-0 w-12 flex items-center justify-center -translate-x-8 text-slate-300 active:text-blue-500 transition-colors z-20 cursor-grab active:cursor-grabbing touch-none"
-                        style={{ touchAction: 'none', WebkitTouchCallout: 'none', userSelect: 'none', WebkitUserSelect: 'none' }}
-                      >
+                      <div className="absolute left-0 top-0 bottom-0 w-12 flex items-center justify-center -translate-x-8 text-slate-300 pointer-events-none">
                         <GripVertical size={22} strokeWidth={2.5} />
                       </div>
                     )}
                     {isEditMode && (
                       <div className="absolute right-3 top-1/2 -translate-y-1/2 flex flex-col gap-2">
-                        <button onClick={(e) => handleDelete(item.id, e)} className="p-2 bg-red-50 text-red-500 rounded-full active:scale-90 transition-transform">
+                        <button onClick={(e) => { e.stopPropagation(); handleDelete(item.id, e); }} className="p-2 bg-red-50 text-red-500 rounded-full active:scale-90 transition-transform">
                           <Trash2 size={16} />
                         </button>
                       </div>
