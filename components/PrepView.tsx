@@ -1,8 +1,8 @@
 import React, { useState, useRef } from 'https://esm.sh/react@19.2.3';
-import { ClipboardList, Plus, CheckCircle2, Circle, ShieldAlert, Users, Trash2, UserPlus, Check, AlertTriangle, X, GripVertical, Settings, Globe, Wallet, Edit3, PhoneCall, StickyNote } from 'https://esm.sh/lucide-react@0.563.0';
+import { ClipboardList, Plus, CheckCircle2, Circle, ShieldAlert, Users, Trash2, UserPlus, Check, AlertTriangle, X, GripVertical, Settings, Globe, Wallet, Edit3, PhoneCall } from 'https://esm.sh/lucide-react@0.563.0';
 import { Member, TripConfig, ChecklistItem, NoteItem, Accommodation, ShoppingItem, ScheduleItem } from '../types.ts';
 
-type PrepTab = 'checklist' | 'emergency' | 'notes' | 'members' | 'settings';
+type PrepTab = 'checklist' | 'emergency' | 'members' | 'settings';
 
 interface EmergencyContact {
   id: string;
@@ -56,14 +56,7 @@ const PrepView: React.FC<PrepViewProps> = ({
   const [activePrepTab, setActivePrepTab] = useState<PrepTab>('checklist');
   const [isEditingMembers, setIsEditingMembers] = useState(false);
   const [isEditingChecklist, setIsEditingChecklist] = useState(false);
-  const [isEditingNotes, setIsEditingNotes] = useState(false);
   const [editingMember, setEditingMember] = useState<Member | null>(null);
-  
-  const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
-  const [editingNoteItem, setEditingNoteItem] = useState<NoteItem | null>(null);
-  const [noteFormData, setNoteFormData] = useState({ title: '', content: '' });
-  const [noteToDeleteId, setNoteToDeleteId] = useState<string | null>(null);
-  const [draggedNoteId, setDraggedNoteId] = useState<string | null>(null);
 
   const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContact[]>([
     { id: '1', name: '警察局', number: '110' },
@@ -90,63 +83,6 @@ const PrepView: React.FC<PrepViewProps> = ({
   const toggleList = (list: ChecklistItem[], setFn: any, id: string) => {
     if (isEditingChecklist) return;
     setFn(list.map(item => item.id === id ? { ...item, checked: !item.checked } : item));
-  };
-
-  const handleNoteDragStart = (e: React.DragEvent, id: string) => {
-    if (!isEditingNotes) return;
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', id);
-    setTimeout(() => setDraggedNoteId(id), 0);
-  };
-
-  const handleNoteDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-  };
-
-  const handleNoteDrop = (e: React.DragEvent, targetId: string) => {
-    e.preventDefault();
-    if (!isEditingNotes || !draggedNoteId || draggedNoteId === targetId) return;
-
-    const newList = [...notes];
-    const draggedIndex = newList.findIndex(c => c.id === draggedNoteId);
-    const targetIndex = newList.findIndex(c => c.id === targetId);
-    
-    if (draggedIndex !== -1 && targetIndex !== -1) {
-      const [draggedItem] = newList.splice(draggedIndex, 1);
-      newList.splice(targetIndex, 0, draggedItem);
-      setNotes(newList);
-    }
-    setDraggedNoteId(null);
-  };
-
-  const handleOpenNoteModal = (note?: NoteItem) => {
-    if (note) {
-      setEditingNoteItem(note);
-      setNoteFormData({ title: note.title, content: note.content });
-    } else {
-      setEditingNoteItem(null);
-      setNoteFormData({ title: '', content: '' });
-    }
-    setIsNoteModalOpen(true);
-  };
-
-  const handleSaveNote = () => {
-    if (!noteFormData.title) return;
-
-    if (editingNoteItem) {
-      setNotes(notes.map(c => c.id === editingNoteItem.id ? { ...c, title: noteFormData.title, content: noteFormData.content } : c));
-    } else {
-      setNotes([{ id: Date.now().toString(), title: noteFormData.title, content: noteFormData.content }, ...notes]);
-    }
-    setIsNoteModalOpen(false);
-  };
-
-  const confirmDeleteNote = () => {
-    if (noteToDeleteId) {
-      setNotes(prev => prev.filter(c => c.id !== noteToDeleteId));
-      setNoteToDeleteId(null);
-    }
   };
 
   const handleStartAddMember = () => {
@@ -258,7 +194,6 @@ const PrepView: React.FC<PrepViewProps> = ({
   const tabs: { id: PrepTab; label: string; icon: any }[] = [
     { id: 'checklist', label: '清單', icon: ClipboardList },
     { id: 'emergency', label: '緊急', icon: ShieldAlert },
-    { id: 'notes', label: '筆記', icon: StickyNote },
     { id: 'members', label: '成員', icon: Users },
     { id: 'settings', label: '設定', icon: Settings },
   ];
@@ -440,71 +375,6 @@ const PrepView: React.FC<PrepViewProps> = ({
         </div>
       )}
 
-      {activePrepTab === 'notes' && (
-        <div className="space-y-6 animate-in fade-in slide-in-from-right duration-300">
-          <div className="flex justify-between items-center px-2">
-            <h2 className="text-xl font-black flex items-center gap-2">
-              <div className="p-2 bg-blue-50 rounded-xl"><StickyNote className="text-blue-600" size={20} /></div>
-              旅遊筆記
-            </h2>
-            <div className="flex items-center gap-2">
-              {isEditingNotes && (
-                <button onClick={() => handleOpenNoteModal()} className="p-2 bg-blue-600 text-white rounded-full shadow-lg shadow-blue-100 active:scale-90 transition-all">
-                  <Plus size={18} />
-                </button>
-              )}
-              <button 
-                onClick={() => setIsEditingNotes(!isEditingNotes)}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold transition-all active:scale-95 border ${
-                  isEditingNotes ? 'bg-slate-900 border-slate-900 text-white' : 'bg-white border-slate-200 text-slate-500'
-                }`}
-              >
-                {isEditingNotes ? <Check size={14} /> : <Edit3 size={14} />}
-                <span>{isEditingNotes ? '完成' : '編輯'}</span>
-              </button>
-            </div>
-          </div>
-          
-          <div className="grid grid-cols-1 gap-4">
-            {notes.map(note => (
-              <div 
-                key={note.id} 
-                draggable={isEditingNotes}
-                onDragStart={(e) => handleNoteDragStart(e, note.id)}
-                onDragOver={handleNoteDragOver}
-                onDrop={(e) => handleNoteDrop(e, note.id)}
-                onDragEnd={() => setDraggedNoteId(null)}
-                onClick={() => handleOpenNoteModal(note)}
-                className={`bg-white rounded-[2rem] p-6 border border-slate-100 shadow-sm transition-all active:scale-[0.98] cursor-pointer hover:border-blue-200 relative ${draggedNoteId === note.id ? 'opacity-40 grayscale scale-95 border-dashed border-blue-300' : ''}`}
-              >
-                <div className="flex justify-between items-start gap-4">
-                   <div className="flex-1 min-w-0">
-                      <h4 className="font-black text-slate-800 text-lg mb-2 truncate">{note.title}</h4>
-                      <p className="text-[11px] text-slate-500 font-bold leading-relaxed line-clamp-3 whitespace-pre-wrap">{note.content}</p>
-                   </div>
-                   {isEditingNotes && (
-                    <div className="flex flex-col gap-2">
-                      <div className="p-1.5 bg-slate-50 text-slate-300 rounded-lg">
-                        <GripVertical size={14} />
-                      </div>
-                      <button onClick={(e) => { e.stopPropagation(); setNoteToDeleteId(note.id); }} className="p-2 bg-red-50 text-red-500 rounded-full active:scale-90 shadow-sm z-20">
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-            {notes.length === 0 && (
-              <div className="text-center py-20 bg-white rounded-[2.5rem] border border-dashed border-slate-200">
-                <StickyNote size={48} className="mx-auto text-slate-100 mb-4" />
-                <p className="text-sm font-bold text-slate-400">目前尚無筆記</p>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
       {activePrepTab === 'members' && (
         <div className="space-y-6 animate-in fade-in slide-in-from-right duration-300">
           <div className="flex justify-between items-center px-2">
@@ -548,55 +418,6 @@ const PrepView: React.FC<PrepViewProps> = ({
                 )}
               </div>
             ))}
-          </div>
-        </div>
-      )}
-
-      {/* Modals */}
-      {isNoteModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-end justify-center px-4 pb-4">
-          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setIsNoteModalOpen(false)}></div>
-          <div className="relative w-full max-w-lg bg-white rounded-[2.5rem] shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-300">
-            <div className="p-6">
-              <div className="flex justify-between items-center mb-6 px-1">
-                <h3 className="text-xl font-black flex items-center gap-2">
-                  <div className="p-2 bg-blue-50 rounded-xl text-blue-600"><StickyNote size={20} /></div>
-                  {editingNoteItem ? '編輯筆記' : '新增筆記'}
-                </h3>
-                <button onClick={() => setIsNoteModalOpen(false)} className="p-2 bg-slate-100 rounded-full text-slate-400"><X size={20} /></button>
-              </div>
-              <div className="space-y-5 max-h-[60vh] overflow-y-auto pr-1 hide-scrollbar">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">標題</label>
-                  <input placeholder="輸入筆記標題..." value={noteFormData.title} onChange={e => setNoteFormData(prev => ({ ...prev, title: e.target.value }))} className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 text-sm font-bold focus:ring-2 focus:ring-blue-600" />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">筆記內容</label>
-                  <textarea placeholder="輸入詳細內容..." value={noteFormData.content} onChange={e => setNoteFormData(prev => ({ ...prev, content: e.target.value }))} className="w-full h-48 bg-slate-50 border-none rounded-2xl p-5 text-sm font-bold focus:ring-2 focus:ring-blue-600 resize-none" />
-                </div>
-              </div>
-              <div className="mt-8 flex gap-3">
-                <button onClick={() => setIsNoteModalOpen(false)} className="flex-1 py-4 bg-slate-100 rounded-2xl font-bold text-slate-500 active:scale-95 transition-all">取消</button>
-                <button onClick={handleSaveNote} disabled={!noteFormData.title} className="flex-[2] py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50"><Check size={18} /> {editingNoteItem ? '儲存修改' : '確認新增'}</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Note Delete Confirmation */}
-      {noteToDeleteId && (
-        <div className="fixed inset-0 z-[250] flex items-center justify-center px-6">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setNoteToDeleteId(null)}></div>
-          <div className="relative w-full max-sm bg-white rounded-[2.5rem] shadow-2xl p-8 text-center animate-in zoom-in-95 duration-200">
-            <div className="w-16 h-16 bg-red-50 rounded-3xl flex items-center justify-center text-red-500 mx-auto mb-4">
-              <AlertTriangle size={32} />
-            </div>
-            <h3 className="text-xl font-black text-slate-800 mb-2">確定要刪除？</h3>
-            <div className="flex flex-col gap-3">
-              <button onClick={confirmDeleteNote} className="w-full py-4 bg-red-500 text-white rounded-2xl font-bold active:scale-95 transition-all">確認刪除</button>
-              <button onClick={() => setNoteToDeleteId(null)} className="w-full py-4 bg-slate-100 text-slate-500 rounded-2xl font-bold active:scale-95 transition-all">取消</button>
-            </div>
           </div>
         </div>
       )}
