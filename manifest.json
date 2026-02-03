@@ -1,6 +1,6 @@
 {
-  "short_name": "WBC行程",
-  "name": "WBC Tokyo 2026 行程表",
+  "short_name": "WBC行程v3",
+  "name": "WBC Tokyo 2026 行程規劃器",
   "start_url": "/",
   "display": "standalone",
   "theme_color": "#f8fafc",
